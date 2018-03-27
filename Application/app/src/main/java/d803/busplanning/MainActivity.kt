@@ -23,40 +23,43 @@ import android.support.v4.app.NotificationCompat
 import android.support.v4.content.ContextCompat
 import android.app.NotificationChannel
 import android.graphics.Color
+import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
-
 class MainActivity : AppCompatActivity() {
-
-
-
+    //private var locationmanager : locationmanager? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        ActivityCompat.requestPermissions(this,arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.READ_CALENDAR,Manifest.permission.ACCESS_NOTIFICATION_POLICY),1)
+        ActivityCompat.requestPermissions(this,arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.READ_CALENDAR),1)
         var tripButton = findViewById<Button>(R.id.button)
-
-
         tripButton.text = "not yet started"
+
+        val intent= Intent(this, SecondaryActivity::class.java)
+        intent.putExtra("key",2)
+        //startActivity(intent)
         tripButton.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View) {
                 calculatePath(tripButton)
-
                 }
-
-
         })
     }
 
     fun calculatePath(tripButton: Button){
         tripButton.text ="Started"
         Thread(){
-            tripButton.text = "resulted hahaha"
-            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=erikholmsparken 178a\n")
-            // val result mangler .readtext men virker ikke for some reason
-            tripButton.text = "backup sladderhank"
+            //tripButton.text = "resulted hahaha"
+
+            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=erikholmsparken 178a&format=json")
+            //val result mangler .readtext men virker ikke for some reason
+            //val reader: JSONObject = JSONObject(result.readText())
+            //val something = reader.getJSONObject("locationslist")
+            runOnUiThread(){
+                tripButton.text = "done"
+            }
         }.start()
+
 
     }
 
