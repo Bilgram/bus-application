@@ -3,13 +3,9 @@ package d803.busplanning
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
-import android.widget.TextView
 import java.net.URL
-import android.R.attr.button
 import android.util.Log
 import android.view.View
-import android.os.AsyncTask.execute
-import java.io.File
 import android.support.v4.app.ActivityCompat
 import android.Manifest
 import android.app.Notification
@@ -17,17 +13,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import java.util.Timer
-import android.content.pm.PackageManager
-import android.support.v4.app.NotificationCompat
-import android.support.v4.content.ContextCompat
-import android.app.NotificationChannel
-import android.graphics.Color
 import android.location.LocationManager
 import android.location.Location
 import android.location.LocationListener
+import android.support.design.widget.TextInputLayout
+import android.widget.TextView
+import org.json.JSONArray
 import org.json.JSONObject
-import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
 class MainActivity : AppCompatActivity() {
@@ -38,6 +30,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         ActivityCompat.requestPermissions(this,arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.READ_CALENDAR),1)
         val tripButton = findViewById<Button>(R.id.button)
+        val inputField = findViewById<TextView>(R.id.textView)
         tripButton.text = "not yet started"
         getLocation()
         val intent= Intent(this, SecondaryActivity::class.java)
@@ -45,30 +38,44 @@ class MainActivity : AppCompatActivity() {
         //startActivity(intent)
         tripButton.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View) {
-                calculatePath(tripButton)
-                getLocation()
+                calculatePath(tripButton,inputField)
+                //getLocation()
                 }
         })
     }
 
-    fun calculatePath(tripButton: Button){
+    fun calculatePath(tripButton: Button, location: TextView){
         tripButton.text ="Started"
         Thread(){
             //tripButton.text = "resulted hahaha"
-            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=erikholmsparken 178a&format=json").readText()
+            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input="+location.text+"&format=json").readText()
             val reader= JSONObject(result)
             val locationlist = reader.getJSONObject("LocationList")
             //val coordLocations = locationlist.getJSONObject(Coo)
-            val coordLocation =locationlist.getJSONArray("CoordLocation")
-            val getResult = coordLocation.getJSONObject(1)
-            val name = getResult.getString("name")
-            val x = getResult.getString("x")
-            val y = getResult.getString("y")
+            val test = locationlist.get("CoordLocation")
+            var name = ""
+            var x = ""
+            var y =""
+
+            if (test is JSONArray) {
+                val coordLocation = locationlist.getJSONArray("CoordLocation")
+                val getResult = coordLocation.getJSONObject(0)
+                name = getResult.getString("name")
+                x = getResult.getString("x")
+                y = getResult.getString("y")
+
+            }
+            else{
+                val getResult = locationlist.getJSONObject("CoordLocation")
+                name = getResult.getString("name")
+                x = getResult.getString("x")
+                y = getResult.getString("y")
+            }
 
 
             //val something = reader.getJSONObject("locationslist")
             runOnUiThread(){
-                tripButton.text = "adress name ="+name +"x ="+x +"and y = "+y
+                tripButton.text = name+x+y+location.text
             }
         }.start()
 
