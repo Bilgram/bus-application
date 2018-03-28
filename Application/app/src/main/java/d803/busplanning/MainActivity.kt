@@ -23,25 +23,30 @@ import android.support.v4.app.NotificationCompat
 import android.support.v4.content.ContextCompat
 import android.app.NotificationChannel
 import android.graphics.Color
+import android.location.LocationManager
+import android.location.Location
+import android.location.LocationListener
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
 class MainActivity : AppCompatActivity() {
-    //private var locationmanager : locationmanager? = null
+    var locationManager:LocationManager?=null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         ActivityCompat.requestPermissions(this,arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.READ_CALENDAR),1)
-        var tripButton = findViewById<Button>(R.id.button)
+        val tripButton = findViewById<Button>(R.id.button)
         tripButton.text = "not yet started"
-
+        getLocation()
         val intent= Intent(this, SecondaryActivity::class.java)
         intent.putExtra("key",2)
         //startActivity(intent)
         tripButton.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View) {
                 calculatePath(tripButton)
+                getLocation()
                 }
         })
     }
@@ -50,24 +55,41 @@ class MainActivity : AppCompatActivity() {
         tripButton.text ="Started"
         Thread(){
             //tripButton.text = "resulted hahaha"
+            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=erikholmsparken 178a&format=json").readText()
+            val reader= JSONObject(result)
+            val locationlist = reader.getJSONObject("LocationList")
+            //val coordLocations = locationlist.getJSONObject(Coo)
+            val coordLocation =locationlist.getJSONArray("CoordLocation")
+            val getResult = coordLocation.getJSONObject(1)
+            val name = getResult.getString("name")
+            val x = getResult.getString("x")
+            val y = getResult.getString("y")
 
-            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=erikholmsparken 178a&format=json")
-            //val result mangler .readtext men virker ikke for some reason
-            //val reader: JSONObject = JSONObject(result.readText())
+
             //val something = reader.getJSONObject("locationslist")
             runOnUiThread(){
-                tripButton.text = "done"
+                tripButton.text = "adress name ="+name +"x ="+x +"and y = "+y
             }
         }.start()
 
 
+    }
+    fun getLocation(){
+        if (locationManager == null)
+            locationManager = applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        try {
+            // Request location updates
+            locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 0f, locationListener);
+        } catch(ex: SecurityException) {
+            Log.d("myTag", "Security Exception, no location available");
+        }
     }
 
     override fun onStop() {
         super.onStop()
         var title = "hej"
         val fixedRateTimer = fixedRateTimer(name="kappa",initialDelay = 100, period = 100){
-            sendNotification(title,"Body")
+            //sendNotification(title,"Body")
             title = title +"j"
         }
 
@@ -89,7 +111,14 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-
+    private val locationListener: LocationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            sendNotification(location.latitude.toString(),location.toString())
+        }
+        override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
+        override fun onProviderEnabled(provider: String) {}
+        override fun onProviderDisabled(provider: String) {}
+    }
     /** base url http://xmlopen.rejseplanen.dk/bin/rest.exe
     url format
     http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
