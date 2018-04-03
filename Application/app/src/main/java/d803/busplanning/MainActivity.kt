@@ -1,5 +1,4 @@
 package d803.busplanning
-
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
@@ -13,13 +12,14 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.location.Geocoder
 import android.location.LocationManager
 import android.location.Location
 import android.location.LocationListener
-import android.support.design.widget.TextInputLayout
 import android.widget.TextView
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
 class MainActivity : AppCompatActivity() {
@@ -28,60 +28,70 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        getLocation()
         ActivityCompat.requestPermissions(this,arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.READ_CALENDAR),1)
         val tripButton = findViewById<Button>(R.id.button)
         val inputField = findViewById<TextView>(R.id.textView)
         tripButton.text = "not yet started"
-        getLocation()
         val intent= Intent(this, SecondaryActivity::class.java)
         intent.putExtra("key",2)
-        //startActivity(intent)
         tripButton.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View) {
                 calculatePath(tripButton,inputField)
-                //getLocation()
+
                 }
         })
     }
 
-    fun calculatePath(tripButton: Button, location: TextView){
-        tripButton.text ="Started"
+    private fun calculatePath(tripButton: Button, location: TextView){
+        tripButton.setText("started")
         Thread(){
-            //tripButton.text = "resulted hahaha"
-            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input="+location.text+"&format=json").readText()
-            val reader= JSONObject(result)
-            val locationlist = reader.getJSONObject("LocationList")
-            //val coordLocations = locationlist.getJSONObject(Coo)
-            val test = locationlist.get("CoordLocation")
-            var name = ""
-            var x = ""
-            var y =""
-
-            if (test is JSONArray) {
-                val coordLocation = locationlist.getJSONArray("CoordLocation")
-                val getResult = coordLocation.getJSONObject(0)
-                name = getResult.getString("name")
-                x = getResult.getString("x")
-                y = getResult.getString("y")
-
+            val destCordinates = getXYCordinates(location.text.toString())
+            var adress = ""
+            try {
+                var startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                val geoCoder = Geocoder(this, Locale.getDefault())
+                adress = geoCoder.getFromLocation(startLocation!!.latitude,startLocation!!.longitude,1)[0].getAddressLine(0)
+            } catch (ex: SecurityException){
+                Log.d("myTag", "Security Exception, no location available");
             }
-            else{
-                val getResult = locationlist.getJSONObject("CoordLocation")
-                name = getResult.getString("name")
-                x = getResult.getString("x")
-                y = getResult.getString("y")
-            }
-
-
-            //val something = reader.getJSONObject("locationslist")
+            val startCordinates = getXYCordinates(adress)
+            //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
+            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?originCoordName=YourLocation&originCoordX="+startCordinates[0]+"&originCoordY="+startCordinates[1]+"&destCoordName="+location.text.toString()+"&destCoordX="+destCordinates[0]+"&destCoordY="+destCordinates[1]+"&format=json\n").readText()
             runOnUiThread(){
-                tripButton.text = name+x+y+location.text
+                tripButton.setText(destCordinates[0]+" "+destCordinates[1])
             }
         }.start()
 
 
     }
-    fun getLocation(){
+
+    private fun getXYCordinates(place: String): List<String> {
+        val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=" + place + "&format=json").readText()
+        val reader = JSONObject(result)
+        val locationlist = reader.getJSONObject("LocationList")
+        var keys = locationlist.keys()
+        //rigtig grim måde at gøre det på
+
+        keys.next()//nonamespace shema location
+        val str = keys.next()//coordlocation eller stoplocation
+        val test = locationlist.get(str)
+
+
+        if (test is JSONArray) {
+            val coordLocation = locationlist.getJSONArray(str)
+            val getResult = coordLocation.getJSONObject(0)
+            val x = getResult.getString("x")
+            val y = getResult.getString("y")
+            return listOf<String>(x, y)
+        }
+        val getResult = locationlist.getJSONObject(str)
+        val x = getResult.getString("x")
+        val y = getResult.getString("y")
+        return listOf<String>(x, y)
+    }
+
+    private fun getLocation(){
         if (locationManager == null)
             locationManager = applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         try {
@@ -133,8 +143,10 @@ class MainActivity : AppCompatActivity() {
     19.09.10&time=07:02&useBus=0*/
 
 
-        
+
 
 }
+
+
 
 

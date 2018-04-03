@@ -9,8 +9,8 @@
     <TextView
         android:id="@+id/textView"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="myrdalstræde 7 9220"
+        android:layout_height="14dp"
+        android:text="Aalborg Busterminal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
@@ -18,8 +18,8 @@
 
     <Button
         android:id="@+id/button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="328dp"
+        android:layout_height="165dp"
         android:layout_marginBottom="28dp"
         android:text="Button"
         app:layout_constraintBottom_toTopOf="@+id/textView"
