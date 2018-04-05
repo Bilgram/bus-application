@@ -1,7 +1,7 @@
 package JSON
 
 
-data class JSON(
+data class TripClass(
 		val TripList: TripList
 )
 
@@ -27,6 +27,7 @@ data class Destination(
 		val type: String,
 		val time: String,
 		val date: String
+
 )
 
 data class Origin(

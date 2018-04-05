@@ -18,7 +18,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.widget.TextView
 import org.json.JSONArray
-import JSON.JSON
+import JSON.TripClass
 import com.beust.klaxon.Klaxon
 import org.json.JSONObject
 import java.util.*
@@ -71,8 +71,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extractTripInfo(pathInfo: String) {
-        val reader = Klaxon().parse<JSON>(pathInfo)
+        val reader = Klaxon().parse<TripClass>(pathInfo)
         val reader2 = reader
+
 
 
 
