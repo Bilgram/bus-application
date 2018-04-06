@@ -5,6 +5,8 @@ data class TripClass(
 		val TripList: TripList
 )
 
+
+
 data class TripList(
 		val noNamespaceSchemaLocation: String,
 		val Trip: List<Trip>

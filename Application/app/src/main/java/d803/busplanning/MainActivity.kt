@@ -1,4 +1,5 @@
 package d803.busplanning
+import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
@@ -19,15 +20,16 @@ import android.location.LocationListener
 import android.widget.TextView
 import org.json.JSONArray
 import JSON.TripClass
+import JSON.TripList
 import com.beust.klaxon.Klaxon
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
 
 class MainActivity : AppCompatActivity() {
     var locationManager:LocationManager?=null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -39,7 +41,6 @@ class MainActivity : AppCompatActivity() {
         tripButton.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View) {
                 calculatePath(tripButton,inputField)
-
                 }
         })
     }
@@ -70,9 +71,32 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun extractTripInfo(pathInfo: String) {
+    private fun extractTripInfo(pathInfo: String): Trip? {
         val reader = Klaxon().parse<TripClass>(pathInfo)
-        val reader2 = reader
+        if (reader != null) {
+            var besttime = 10000000000
+            val triplist = reader.TripList
+            val trip = triplist.Trip
+            var bestTrip = trip.first()
+            val iterator = trip.iterator()
+            if (iterator.hasNext()) {
+                iterator.next()
+            }
+            iterator.forEach {
+                var startTime = SimpleDateFormat("hh:mm").parse(it.Leg.first().Origin.time)
+                var endTime = SimpleDateFormat("hh:mm").parse(it.Leg.last().Destination.time)
+                var duration = endTime.time - startTime.time
+                if (duration > besttime) {
+                    besttime = duration
+                    bestTrip = it
+
+                }
+            }
+
+            return bestTrip
+        }
+        return null
+
 
 
 
