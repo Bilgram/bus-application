@@ -20,12 +20,16 @@ import android.widget.TextView
 import org.json.JSONArray
 import JSON.TripClass
 import com.beust.klaxon.Klaxon
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.api.GoogleApi
+import com.google.android.gms.common.api.GoogleApiClient
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), GoogleApiClient.OnConnectionFailedListener, GoogleApiClient.ConnectionCallbacks {
+
     var locationManager:LocationManager?=null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -149,6 +153,7 @@ class MainActivity : AppCompatActivity() {
         override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
+        fun onConnectionFailed(provider: String){}
     }
     /** base url http://xmlopen.rejseplanen.dk/bin/rest.exe
     url format
