@@ -1,5 +1,6 @@
 package JSON
-
+import java.text.SimpleDateFormat
+import java.util.Date;
 
 data class TripClass(
 		val TripList: TripList
@@ -14,7 +15,15 @@ data class TripList(
 
 data class Trip(
 		val Leg: List<Leg>
-)
+) {
+	fun getDuration(): Long {
+		val seconds = 1000
+		val to = SimpleDateFormat("hh:mm").parse(Leg.last().Destination.time)
+		val from = SimpleDateFormat("hh:mm").parse(Leg.first().Origin.time)
+		val result = to.time - from.time
+		return result/seconds
+	}
+}
 
 data class Leg(
 		val name: String,
