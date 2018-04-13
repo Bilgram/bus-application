@@ -33,16 +33,11 @@ import java.lang.Long.MAX_VALUE
 import kotlin.concurrent.thread
 
 
-<<<<<<< HEAD
-class MainActivity : AppCompatActivity() {
-    var locationManager: LocationManager? = null
-=======
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener{
     var locationManager:LocationManager?=null
 
     var mApiClient: GoogleApiClient? = null
 
->>>>>>> bille
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -204,11 +199,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
     destCoordY=<yInteger>&destCoordName=<NameOfDestination>&date=
     19.09.10&time=07:02&useBus=0*/
-<<<<<<< HEAD
 
-
-=======
->>>>>>> bille
 }
 
 
