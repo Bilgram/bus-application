@@ -24,6 +24,7 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityRecognitionClient
+import com.google.android.gms.tasks.Task
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
@@ -61,8 +62,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     override fun onConnected(bundle: Bundle?) {
         val intent = Intent(this, ActivityDetection::class.java)
         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val activityDection = ActivityDetection()
-        activityDection.requestActivityTransitionUpdates(this, pendingIntent)
+        val per = ActivityRecognition.getClient(this)
+        per.requestActivityUpdates(0, pendingIntent)
     }
 
     override fun onConnectionSuspended(i: Int) {
@@ -79,7 +80,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             val destCordinates = getXYCordinates(location.text.toString())
             var adress = ""
             try {
-                var startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 val geoCoder = Geocoder(this, Locale.getDefault())
                 adress = geoCoder.getFromLocation(startLocation!!.latitude,startLocation!!.longitude,1)[0].getAddressLine(0)
             } catch (ex: SecurityException){
