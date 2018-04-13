@@ -1,5 +1,4 @@
 package d803.busplanning
-
 import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -21,15 +20,10 @@ import android.location.LocationListener
 import android.widget.TextView
 import org.json.JSONArray
 import JSON.TripClass
-import JSON.TripList
 import com.beust.klaxon.Klaxon
-import kotlinx.coroutines.experimental.CommonPool
-import kotlinx.coroutines.experimental.async
 import org.json.JSONObject
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
-import kotlinx.coroutines.experimental.launch
 import java.lang.Long.MAX_VALUE
 import kotlin.concurrent.thread
 
@@ -57,7 +51,7 @@ class MainActivity : AppCompatActivity() {
             val destCordinates = getXYCordinates(location.text.toString())
             var adress = ""
             try {
-                var startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 val geoCoder = Geocoder(this, Locale.getDefault())
                 adress = geoCoder.getFromLocation(startLocation!!.latitude, startLocation!!.longitude, 1)[0].getAddressLine(0)
             } catch (ex: SecurityException) {
@@ -71,13 +65,13 @@ class MainActivity : AppCompatActivity() {
 
             runOnUiThread {
                 val tripInfo = extractTripInfo(result)
-                tripButton.setText(tripInfo.toString())
+                tripButton.setText(tripInfo!!.Leg.first().Origin.name + tripInfo.Leg.first().Origin.time)
                 }
 
         }.start()
     }
 
-    private fun extractTripInfo(pathInfo: String): Long {
+    private fun extractTripInfo(pathInfo: String): Trip? {
         var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
         if (reader != null) {
@@ -94,9 +88,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            return bestTime
+            return bestTrip
         }
-        return bestTime
+        return null
 
 
     }
@@ -107,12 +101,9 @@ class MainActivity : AppCompatActivity() {
         val locationlist = reader.getJSONObject("LocationList")
         var keys = locationlist.keys()
         //rigtig grim måde at gøre det på måske
-
         keys.next()//nonamespaceshemalocation
         val str = keys.next()//coordlocation eller stoplocation
         val test = locationlist.get(str)
-
-
         if (test is JSONArray) {
             val coordLocation = locationlist.getJSONArray(str)
             val getResult = coordLocation.getJSONObject(0)
