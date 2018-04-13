@@ -21,6 +21,11 @@ import android.widget.TextView
 import org.json.JSONArray
 import JSON.TripClass
 import com.beust.klaxon.Klaxon
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.api.GoogleApiClient
+import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityRecognitionClient
+import com.google.android.gms.tasks.Task
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
@@ -28,15 +33,23 @@ import java.lang.Long.MAX_VALUE
 import kotlin.concurrent.thread
 
 
+<<<<<<< HEAD
 class MainActivity : AppCompatActivity() {
     var locationManager: LocationManager? = null
+=======
+class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener{
+    var locationManager:LocationManager?=null
+
+    var mApiClient: GoogleApiClient? = null
+
+>>>>>>> bille
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         getLocation()
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
         val tripButton = findViewById<Button>(R.id.button)
-        val inputField = findViewById<TextView>(R.id.textView)
+        val inputField = findViewById<TextView>(R.id.textView)//Per er det virkelig sådan her det skal gøres?
         tripButton.text = "not yet started"
         tripButton.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View) {
@@ -44,6 +57,29 @@ class MainActivity : AppCompatActivity() {
             }
 
         })
+
+        mApiClient = GoogleApiClient.Builder(this)
+        .addApi(ActivityRecognition.API)
+        .addConnectionCallbacks(this)
+        .addOnConnectionFailedListener(this)
+        .build();
+
+        mApiClient?.connect();
+    }
+
+    override fun onConnected(bundle: Bundle?) {
+        val intent = Intent(this, ActivityDetection::class.java)
+        val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val per = ActivityRecognition.getClient(this)
+        per.requestActivityUpdates(0, pendingIntent)
+    }
+
+    override fun onConnectionSuspended(i: Int) {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    override fun onConnectionFailed(connectionResult: ConnectionResult) {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
     private fun calculatePath(tripButton: Button, location: TextView) {
@@ -168,8 +204,11 @@ class MainActivity : AppCompatActivity() {
     http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
     destCoordY=<yInteger>&destCoordName=<NameOfDestination>&date=
     19.09.10&time=07:02&useBus=0*/
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> bille
 }
 
 
