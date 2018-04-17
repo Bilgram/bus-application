@@ -1,4 +1,5 @@
 package d803.busplanning
+import JSON.Destination
 import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -24,12 +25,12 @@ import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
-import com.google.android.gms.location.ActivityRecognitionClient
-import com.google.android.gms.tasks.Task
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import java.lang.Long.MAX_VALUE
+import java.text.SimpleDateFormat
+import java.time.LocalDateTime
 import kotlin.concurrent.thread
 
 
@@ -43,15 +44,10 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         setContentView(R.layout.activity_main)
         getLocation()
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
-        val tripButton = findViewById<Button>(R.id.button)
-        val inputField = findViewById<TextView>(R.id.textView)//Per er det virkelig sådan her det skal gøres?
-        tripButton.text = "not yet started"
-        tripButton.setOnClickListener(object : View.OnClickListener {
-            override fun onClick(v: View) {
-                calculatePath(tripButton, inputField)
-            }
+        val timeField = findViewById<TextView>(R.id.time)
+        val locationField = findViewById<TextView>(R.id.location)
+        calculatePath(locationField, timeField)
 
-        })
 
         mApiClient = GoogleApiClient.Builder(this)
         .addApi(ActivityRecognition.API)
@@ -77,26 +73,36 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    private fun calculatePath(tripButton: Button, location: TextView) {
+    private fun calculatePath(locationField: TextView, timeField: TextView) {
+        val customLocation = "Aalborg Busterminal"
         thread {
-            val destCordinates = getXYCordinates(location.text.toString())
+            val destCordinates = getXYCordinates(customLocation)
             var adress = ""
             try {
                 val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 val geoCoder = Geocoder(this, Locale.getDefault())
-                adress = geoCoder.getFromLocation(startLocation!!.latitude, startLocation!!.longitude, 1)[0].getAddressLine(0)
+                adress = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
             } catch (ex: SecurityException) {
                 Log.d("myTag", "Security Exception, no location available");
             }
             val startCordinates = getXYCordinates(adress)
             //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
             val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
-                    "originCoordName=YourLocation&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
-                    "&destCoordName=" + location.text.toString() + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+                    "originCoordName="+adress.toString()+"&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
+                    "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
 
             runOnUiThread {
+                val busField = findViewById<TextView>(R.id.bus)
                 val tripInfo = extractTripInfo(result)
-                tripButton.setText(tripInfo!!.Leg.first().Origin.name + tripInfo.Leg.first().Origin.time)
+                val from = SimpleDateFormat("hh:mm").parse(tripInfo!!.Leg.first().Origin.time)
+                val current = java.util.Calendar.getInstance()
+                //val result = (current.time - from.time)/1000
+                //val min = (result/60).toInt().toString()
+                //val seconds = (result % 60).toString()
+                val bus = tripInfo.Leg.filter { l->l.type != "WALK"}.first()
+                busField.setText(bus.name)
+                locationField.setText(tripInfo!!.Leg.first().Destination.name)
+                timeField.setText(tripInfo.Leg.first().Destination.time)
                 }
 
         }.start()
