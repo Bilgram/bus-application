@@ -1,12 +1,9 @@
 package d803.busplanning
-import JSON.Destination
 import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
-import android.widget.Button
 import java.net.URL
 import android.util.Log
-import android.view.View
 import android.support.v4.app.ActivityCompat
 import android.Manifest
 import android.app.Notification
@@ -19,24 +16,29 @@ import android.location.LocationManager
 import android.location.Location
 import android.location.LocationListener
 import android.widget.TextView
+import android.widget.ProgressBar
 import org.json.JSONArray
 import JSON.TripClass
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.view.View
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
+import kotlinx.android.synthetic.main.activity_main.*
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import java.lang.Long.MAX_VALUE
 import java.text.SimpleDateFormat
-import java.time.LocalDateTime
 import kotlin.concurrent.thread
 
 
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener{
     var locationManager:LocationManager?=null
-
     var mApiClient: GoogleApiClient? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,23 +48,23 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
         val timeField = findViewById<TextView>(R.id.time)
         val locationField = findViewById<TextView>(R.id.location)
+        val progressBar = this.progressOverview
+        updateProgressBar(progressBar)
         calculatePath(locationField, timeField)
-
 
         mApiClient = GoogleApiClient.Builder(this)
         .addApi(ActivityRecognition.API)
         .addConnectionCallbacks(this)
         .addOnConnectionFailedListener(this)
         .build();
-
         mApiClient?.connect();
     }
 
     override fun onConnected(bundle: Bundle?) {
         val intent = Intent(this, ActivityDetection::class.java)
         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val per = ActivityRecognition.getClient(this)
-        per.requestActivityUpdates(0, pendingIntent)
+        val client = ActivityRecognition.getClient(this)
+        client.requestActivityUpdates(0, pendingIntent)
     }
 
     override fun onConnectionSuspended(i: Int) {
@@ -104,7 +106,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 locationField.setText(tripInfo!!.Leg.first().Destination.name)
                 timeField.setText(tripInfo.Leg.first().Destination.time)
                 }
-
         }.start()
     }
 
@@ -112,24 +113,19 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
         if (reader != null) {
-
             val triplist = reader.TripList
             val trips = triplist.Trip
             val tripping = trips.first().Leg
             var bestTrip = trips.first()
             for (trip in trips){
-
                 if (trip.getDuration() < bestTime){
                     bestTime = trip.getDuration()
                     bestTrip = trip
                 }
             }
-
             return bestTrip
         }
         return null
-
-
     }
 
     private fun getXYCordinates(place: String): List<String> {
@@ -172,8 +168,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             //sendNotification(title,"Body")
             title = title + "j"
         }
-
-
     }
 
     fun sendNotification(title: String, body: String) {
@@ -188,14 +182,27 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         notification.flags = Notification.FLAG_AUTO_CANCEL
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(0, notification)
+    }
 
+    fun updateProgressBar(progressBar: ProgressBar){
+        runOnUiThread{
+            val drawable = progressBar.progressDrawable
+            drawable.colorFilter = createColor()
+            progressBar.setProgressDrawable(drawable)
+            progressBar.progress = 50
+        }
+    }
+
+    fun createColor(): PorterDuffColorFilter{
+        val color = android.graphics.Color.argb(255, 153,153,153)
+        val colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY)
+        return colorFilter
     }
 
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             sendNotification(location.latitude.toString(), location.toString())
         }
-
         override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
@@ -205,7 +212,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
     destCoordY=<yInteger>&destCoordName=<NameOfDestination>&date=
     19.09.10&time=07:02&useBus=0*/
-
 }
 
 
