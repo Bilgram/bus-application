@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     var current = getCurrentTime()
                     minutesToBus = (from.time - current) / 60000
                     runOnUiThread {
-                        timeField.setText(minutesToBus.toString() + "\n min")
+                        timeField.setText(minutesToBus.toString())
                     }
                     val kappa = "test"
                     if (minutesToBus < 15)
