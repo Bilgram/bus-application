@@ -111,17 +111,23 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     private fun extractTripInfo(pathInfo: String): Trip? {
         var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
+        val tripMetrics = "first"
         if (reader != null) {
 
             val triplist = reader.TripList
             val trips = triplist.Trip
             val tripping = trips.first().Leg
             var bestTrip = trips.first()
-            for (trip in trips){
+            if (tripMetrics == "first"){
+                return bestTrip
+            }
+            else if (tripMetrics == "fastest") {
+                for (trip in trips) {
 
-                if (trip.getDuration() < bestTime){
-                    bestTime = trip.getDuration()
-                    bestTrip = trip
+                    if (trip.getDuration() < bestTime) {
+                        bestTime = trip.getDuration()
+                        bestTrip = trip
+                    }
                 }
             }
 
