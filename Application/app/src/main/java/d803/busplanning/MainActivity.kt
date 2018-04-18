@@ -95,23 +95,45 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 val busField = findViewById<TextView>(R.id.bus)
                 val tripInfo = extractTripInfo(result)
                 val from = SimpleDateFormat("hh:mm").parse(tripInfo!!.Leg.first().Origin.time)
-                val current = java.util.Calendar.getInstance()
-                //val result = (current.time - from.time)/1000
-                //val min = (result/60).toInt().toString()
-                //val seconds = (result % 60).toString()
                 val bus = tripInfo.Leg.filter { l->l.type != "WALK"}.first()
                 busField.setText(bus.name)
-                locationField.setText(tripInfo!!.Leg.first().Destination.name)
-                timeField.setText(tripInfo.Leg.first().Destination.time)
+                locationField.setText(tripInfo.Leg.first().name+ "\n " + tripInfo!!.Leg.first().Destination.name)
+                var minutesToBus = (from.time - getCurrentTime())/60000
+                timeField.setText(minutesToBus.toString() + "\n min")
+                val fixedRateTimer = fixedRateTimer(name = "kappa2", initialDelay = 100, period = 60000) {
+                    var current = getCurrentTime()
+                    minutesToBus = (from.time - current)/60000
+                    runOnUiThread{
+                        timeField.setText(minutesToBus.toString() + "\n min")
+                    }
+                    val kappa = "test"
+                    if (minutesToBus < 15)
+                        sendNotification("Gå","om 15 minuter")
                 }
-
+                fixedRateTimer.run {  }
+                }
         }.start()
+    }
+
+    private fun getCurrentTime(): Long {
+        val current = java.util.Calendar.getInstance().getTime()
+        var currentHourMin = ""
+        if (current.minutes < 10){
+            currentHourMin = current.hours.toString() + ":"+ "0" + current.minutes.toString()
+        }
+        else {
+            currentHourMin = current.hours.toString() + ":" + current.minutes.toString()
+        }
+        val to = SimpleDateFormat("hh:mm").parse(currentHourMin)
+        return to.time
+
+
     }
 
     private fun extractTripInfo(pathInfo: String): Trip? {
         var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
-        val tripMetrics = "first"
+        val tripMetrics = "fastest"
         if (reader != null) {
 
             val triplist = reader.TripList
