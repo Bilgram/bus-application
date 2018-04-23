@@ -58,6 +58,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         updateProgressBar(progressBar)
         doAsync {
             currentTrip = calculatePath()
+            val trip = updateUI(currentTrip!!)
+            doTrip(trip)
+
         }
 
 
@@ -71,32 +74,53 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
-    private fun updataUI(trip: Trip) {
+    private fun doTrip(trip: Trip?) {
+
+    }
+
+    private fun updateUI(trip: Trip): Trip? {
         val locationField = this.location
         var fifteenMinNotifcation = false
         var zeroMinNotfication = false
-        locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
-        val from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
+        var commitedTrip:Trip? = null
         val timeField = this.time
         val busField = this.time
+        var from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
+        var minutesToBus = (from.time - getCurrentTime()) / 60000
         var bus = trip.Leg.filter { l->l.type != "WALK"}.first()
-        busField.setText(bus.name)
         val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100) {
-            var minutesToBus = (from.time - getCurrentTime()) / 60000
-            runOnUiThread(){
-                timeField.setText(minutesToBus.toString())
+            if (commitedTrip == null) {
+                from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
+                minutesToBus = (from.time - getCurrentTime()) / 60000
+                locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
+                bus = trip.Leg.filter { l->l.type != "WALK"}.first()
+                runOnUiThread() {
+                    timeField.setText(minutesToBus.toString())
+                    busField.setText(bus.name)
+                }
+                if (minutesToBus >= 15 && !fifteenMinNotifcation) {
+                    fifteenMinNotifcation = true
+                    sendNotification("gå", "om 15 min")
+                    commitedTrip = trip
+                }
+
             }
-            if (minutesToBus >= 15 && !fifteenMinNotifcation){
-                fifteenMinNotifcation = true
-                sendNotification("gå","om 15 min")
-            }
-            if(minutesToBus >= 0 && !zeroMinNotfication){
-                zeroMinNotfication = true
-                sendNotification("gå","nu")
+            else {
+                minutesToBus = (from.time - getCurrentTime()) / 60000
+                runOnUiThread() { timeField.setText(minutesToBus.toString()) }
+                if (minutesToBus >= 0 && !zeroMinNotfication) {
+                    zeroMinNotfication = true
+                    sendNotification("gå", "nu")
+                    cancel()
+                }
             }
         }
         fixedRateTimer.run{}
+        //nok rigtig rigtig grim møde at gøre det på
+        while (!zeroMinNotfication){
 
+        }
+        return commitedTrip
 
     }
 
@@ -124,6 +148,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             val geoCoder = Geocoder(this, Locale.getDefault())
             adress = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
         } catch (ex: SecurityException) {
+            //sørger for at det ikke crasher og locationlistenerens call burde gøre det irelevant
+            adress = "selmalagerløfsvej 300"
             Log.d("myTag", "Security Exception, no location available");
         }
         val startCordinates = getXYCordinates(adress)
@@ -152,7 +178,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     private fun extractTripInfo(pathInfo: String): Trip? {
         var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
-        val tripMetrics = "fastest"
+        val tripMetrics = "first"
         if (reader != null) {
             val triplist = reader.TripList
             val trips = triplist.Trip
