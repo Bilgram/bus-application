@@ -58,7 +58,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         updateProgressBar(progressBar)
         doAsync {
             currentTrip = calculatePath()
-            }
         }
 
 
@@ -248,7 +247,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
-            sendNotification(location.latitude.toString(), location.toString())
+            currentTrip = calculatePath()
         }
 
         override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
