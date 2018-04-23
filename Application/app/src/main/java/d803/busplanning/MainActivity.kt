@@ -77,10 +77,11 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val locationField = this@MainActivity.location
         val timeField = this@MainActivity.time
         val busField = this@MainActivity.time
+        var bus = trip.Leg.filter { l->l.type != "WALK"}.first()
         val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100) {
             runOnUiThread(){
                 locationField.setText(trip.Leg.first().Destination.name)
-                //busField.setText(trip.Leg.)
+                busField.setText(bus.name)
             }
         }
     }
