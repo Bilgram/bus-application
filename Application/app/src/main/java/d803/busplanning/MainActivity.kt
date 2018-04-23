@@ -80,18 +80,18 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val customLocation = "Aalborg Busterminal"
         thread {
             val destCordinates = getXYCordinates(customLocation)
-            var adress = ""
+            var address = ""
             try {
                 val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 val geoCoder = Geocoder(this, Locale.getDefault())
-                adress = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
+                address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
             } catch (ex: SecurityException) {
                 Log.d("myTag", "Security Exception, no location available");
             }
-            val startCordinates = getXYCordinates(adress)
+            val startCordinates = getXYCordinates(address)
             //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
             val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
-                    "originCoordName=" + adress.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
+                    "originCoordName=" + address.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
                     "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
 
             runOnUiThread {
@@ -100,7 +100,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 val from = SimpleDateFormat("hh:mm").parse(tripInfo!!.Leg.first().Origin.time)
                 val bus = tripInfo.Leg.filter { l -> l.type != "WALK" }.first()
                 busField.setText(bus.name)
-                locationField.setText(tripInfo.Leg.first().name + "\n " + tripInfo!!.Leg.first().Destination.name)
+                locationField.setText(tripInfo!!.Leg.first().Destination.name)
+                this.activity.setText(tripInfo.Leg.first().type)
                 var minutesToBus = (from.time - getCurrentTime()) / 60000
                 timeField.setText(minutesToBus.toString() + "\n min")
                 val fixedRateTimer = fixedRateTimer(name = "kappa2", initialDelay = 100, period = 60000) {
@@ -202,7 +203,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     fun sendNotification(title: String, body: String) {
         val intent = Intent()
         val pendingIntent = PendingIntent.getActivity(this@MainActivity, 0, intent, 0)
-        val notification = Notification.Builder(this@MainActivity)
+        val notification = Notification.Builder(this@MainActivity) //https://stackoverflow.com/questions/45462666/notificationcompat-builder-deprecated-in-android-o?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
                 .setTicker("")
                 .setContentTitle(title)
                 .setContentText(body)
