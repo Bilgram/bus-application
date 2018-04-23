@@ -32,6 +32,7 @@ import com.google.android.gms.location.ActivityRecognition
 import kotlinx.android.synthetic.main.activity_main.*
 import org.jetbrains.anko.coroutines.experimental.asReference
 import org.jetbrains.anko.doAsync
+import org.jetbrains.anko.uiThread
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
@@ -53,10 +54,10 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val progressBar = this.progressOverview
         updateProgressBar(progressBar)
         val ref = this.asReference()
-        doAsync {
+        val trip = doAsync {
             val trip = calculatePath()
             if (trip != null){
-                updataUI(trip)
+               uiThread { updataUI(trip) }
             }
 
 
@@ -74,16 +75,29 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun updataUI(trip: Trip) {
-        val locationField = this@MainActivity.location
-        val timeField = this@MainActivity.time
-        val busField = this@MainActivity.time
+        val locationField = this.location
+        locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
+        val from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
+        val timeField = this.time
+        val busField = this.time
         var bus = trip.Leg.filter { l->l.type != "WALK"}.first()
+        busField.setText(bus.name)
         val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100) {
+            var minutesToBus = (from.time - getCurrentTime()) / 60000
             runOnUiThread(){
-                locationField.setText(trip.Leg.first().Destination.name)
-                busField.setText(bus.name)
+                timeField.setText(minutesToBus.toString())
+
+            }
+            if (minutesToBus >= 15){
+                sendNotification("gå","om 15 min")
+            }
+            if(minutesToBus >= 0){
+                sendNotification("gå","nu")
+
             }
         }
+        fixedRateTimer.run{}
+        fixedRateTimer.cancel()
     }
 
     override fun onConnected(bundle: Bundle?) {
