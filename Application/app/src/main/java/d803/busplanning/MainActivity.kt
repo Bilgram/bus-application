@@ -30,6 +30,8 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
 import kotlinx.android.synthetic.main.activity_main.*
+import org.jetbrains.anko.coroutines.experimental.asReference
+import org.jetbrains.anko.doAsync
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
@@ -47,11 +49,21 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         setContentView(R.layout.activity_main)
         getLocation()
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
-        val timeField = findViewById<TextView>(R.id.time)
-        val locationField = findViewById<TextView>(R.id.location)
+
         val progressBar = this.progressOverview
         updateProgressBar(progressBar)
-        calculatePath(locationField, timeField)
+        val ref = this.asReference()
+        doAsync {
+            val trip = calculatePath()
+            if (trip != null){
+                updataUI(trip)
+            }
+
+
+        }
+
+
+
 
         mApiClient = GoogleApiClient.Builder(this)
                 .addApi(ActivityRecognition.API)
@@ -59,6 +71,18 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 .addOnConnectionFailedListener(this)
                 .build();
         mApiClient?.connect();
+    }
+
+    private fun updataUI(trip: Trip) {
+        val locationField = this@MainActivity.location
+        val timeField = this@MainActivity.time
+        val busField = this@MainActivity.time
+        val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100) {
+            runOnUiThread(){
+                locationField.setText(trip.Leg.first().Destination.name)
+                //busField.setText(trip.Leg.)
+            }
+        }
     }
 
     override fun onConnected(bundle: Bundle?) {
@@ -76,46 +100,24 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    private fun calculatePath(locationField: TextView, timeField: TextView) {
+    private fun calculatePath(): Trip? {
         val customLocation = "Aalborg Busterminal"
-        thread {
-            val destCordinates = getXYCordinates(customLocation)
-            var adress = ""
-            try {
-                val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                val geoCoder = Geocoder(this, Locale.getDefault())
-                adress = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
-            } catch (ex: SecurityException) {
-                Log.d("myTag", "Security Exception, no location available");
-            }
-            val startCordinates = getXYCordinates(adress)
-            //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
-            val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
-                    "originCoordName=" + adress.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
-                    "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
-
-            runOnUiThread {
-                val busField = findViewById<TextView>(R.id.bus)
-                val tripInfo = extractTripInfo(result)
-                val from = SimpleDateFormat("hh:mm").parse(tripInfo!!.Leg.first().Origin.time)
-                val bus = tripInfo.Leg.filter { l -> l.type != "WALK" }.first()
-                busField.setText(bus.name)
-                locationField.setText(tripInfo.Leg.first().name + "\n " + tripInfo!!.Leg.first().Destination.name)
-                var minutesToBus = (from.time - getCurrentTime()) / 60000
-                timeField.setText(minutesToBus.toString() + "\n min")
-                val fixedRateTimer = fixedRateTimer(name = "kappa2", initialDelay = 100, period = 60000) {
-                    var current = getCurrentTime()
-                    minutesToBus = (from.time - current) / 60000
-                    runOnUiThread {
-                        timeField.setText(minutesToBus.toString())
-                    }
-                    val kappa = "test"
-                    if (minutesToBus < 15)
-                        sendNotification("Gå", "om 15 minuter")
-                }
-                fixedRateTimer.run { }
-            }
-        }.start()
+        val destCordinates = getXYCordinates(customLocation)
+        var adress = ""
+        try {
+            val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            val geoCoder = Geocoder(this, Locale.getDefault())
+            adress = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
+        } catch (ex: SecurityException) {
+            Log.d("myTag", "Security Exception, no location available");
+        }
+        val startCordinates = getXYCordinates(adress)
+        //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
+        val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
+                "originCoordName=" + adress.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
+                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+        val tripInfo = extractTripInfo(result)
+        return tripInfo
     }
 
     private fun getCurrentTime(): Long {
