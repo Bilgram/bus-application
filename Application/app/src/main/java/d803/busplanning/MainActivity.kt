@@ -20,11 +20,8 @@ import android.widget.TextView
 import android.widget.ProgressBar
 import org.json.JSONArray
 import JSON.TripClass
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
-import android.view.View
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
@@ -41,6 +38,7 @@ import kotlin.concurrent.thread
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
+    var activityReader: ActivityReader? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,19 +51,29 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         updateProgressBar(progressBar)
         calculatePath(locationField, timeField)
 
+        // Starting the Google API client
         mApiClient = GoogleApiClient.Builder(this)
                 .addApi(ActivityRecognition.API)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .build();
         mApiClient?.connect();
+
     }
 
+
     override fun onConnected(bundle: Bundle?) {
+        registerGoogleActivity()
+    }
+
+    private fun registerGoogleActivity() {
         val intent = Intent(this, ActivityDetection::class.java)
+        var nice = 0
         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
         val client = ActivityRecognition.getClient(this)
-        client.requestActivityUpdates(0, pendingIntent)
+        client.requestActivityUpdates(500, pendingIntent)
+        if (activityReader!!.ActivityType == "IN_VECHILE" && activityReader!!.values.first() > 80)
+            nice = 50
     }
 
     override fun onConnectionSuspended(i: Int) {

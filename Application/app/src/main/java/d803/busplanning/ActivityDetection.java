@@ -2,58 +2,75 @@ package d803.busplanning;
 
 import android.app.IntentService;
 import android.content.Intent;
-import android.util.Log;
 import com.google.android.gms.location.ActivityRecognitionResult;
 import com.google.android.gms.location.DetectedActivity;
+import java.io.IOException;
 import java.util.List;
 
 public class ActivityDetection extends IntentService{
 
     public ActivityDetection(){
-        super("Hvad med fucking ja!");
+        super("ActivityDetection");
+    }
+
+    public ActivityDetection(String name){
+        super(name);
     }
 
     @Override
     protected void onHandleIntent(Intent intent) {
         if (ActivityRecognitionResult.hasResult(intent)) {
             ActivityRecognitionResult result = ActivityRecognitionResult.extractResult(intent);
-            handleDetectedActivities(result.getProbableActivities());
+            try {
+                handleDetectedActivities(result.getProbableActivities());
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
-    private void handleDetectedActivities(List<DetectedActivity> probableActivities) {
+    private void handleDetectedActivities(List<DetectedActivity> probableActivities) throws IOException {
         for( DetectedActivity activity : probableActivities ) {
             switch( activity.getType() ) {
                 case DetectedActivity.IN_VEHICLE: {
-                    Log.e( "ActivityRecogition", "In Vehicle: " + activity.getConfidence() );
+                    new ActivityReader( "IN_VEHICLE",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
                 case DetectedActivity.ON_BICYCLE: {
-                    Log.e( "ActivityRecogition", "On Bicycle: " + activity.getConfidence() );
+                    new ActivityReader( "ON_BICYCLE",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
                 case DetectedActivity.ON_FOOT: {
-                    Log.e( "ActivityRecogition", "On Foot: " + activity.getConfidence() );
+                    new ActivityReader( "ON_FOOT",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
                 case DetectedActivity.RUNNING: {
-                    Log.e( "ActivityRecogition", "Running: " + activity.getConfidence() );
+                    new ActivityReader( "RUNNING",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
                 case DetectedActivity.STILL: {
-                    Log.e( "ActivityRecogition", "Still: " + activity.getConfidence() );
+                    new ActivityReader( "STILL",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
                 case DetectedActivity.TILTING: {
-                    Log.e( "ActivityRecogition", "Tilting: " + activity.getConfidence() );
+                    new ActivityReader( "TILTING",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
                 case DetectedActivity.WALKING: {
-                    Log.e( "ActivityRecogition", "Walking: " + activity.getConfidence() );
+                    new ActivityReader( "WALKING",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
                 case DetectedActivity.UNKNOWN: {
-                    Log.e( "ActivityRecogition", "Unknown: " + activity.getConfidence() );
+                    new ActivityReader( "UNKNOWN",
+                            new float[]{activity.getConfidence()}, System.currentTimeMillis());
                     break;
                 }
             }
