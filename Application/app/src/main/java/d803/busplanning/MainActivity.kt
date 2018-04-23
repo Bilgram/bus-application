@@ -30,6 +30,7 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.coroutines.experimental.asReference
 import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.uiThread
@@ -38,11 +39,13 @@ import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import java.lang.Long.MAX_VALUE
 import java.text.SimpleDateFormat
+import java.util.concurrent.Future
 import kotlin.concurrent.thread
 
 
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
+    var currentTrip :Trip? = null
     var mApiClient: GoogleApiClient? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,14 +56,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
         val progressBar = this.progressOverview
         updateProgressBar(progressBar)
-        val ref = this.asReference()
-        val trip = doAsync {
-            val trip = calculatePath()
-            if (trip != null){
-               uiThread { updataUI(trip) }
+        doAsync {
+            currentTrip = calculatePath()
             }
-
-
         }
 
 
@@ -76,6 +74,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private fun updataUI(trip: Trip) {
         val locationField = this.location
+        var fifteenMinNotifcation = false
+        var zeroMinNotfication = false
         locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
         val from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
         val timeField = this.time
@@ -86,18 +86,19 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             var minutesToBus = (from.time - getCurrentTime()) / 60000
             runOnUiThread(){
                 timeField.setText(minutesToBus.toString())
-
             }
-            if (minutesToBus >= 15){
+            if (minutesToBus >= 15 && !fifteenMinNotifcation){
+                fifteenMinNotifcation = true
                 sendNotification("gå","om 15 min")
             }
-            if(minutesToBus >= 0){
+            if(minutesToBus >= 0 && !zeroMinNotfication){
+                zeroMinNotfication = true
                 sendNotification("gå","nu")
-
             }
         }
         fixedRateTimer.run{}
-        fixedRateTimer.cancel()
+
+
     }
 
     override fun onConnected(bundle: Bundle?) {
@@ -133,7 +134,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
         val tripInfo = extractTripInfo(result)
         return tripInfo
-
     }
 
     private fun getCurrentTime(): Long {
