@@ -7,3 +7,4 @@ class ActivityReader(
     val values: FloatArray,
     // The time for when the confident was read
     val time: Long)
+

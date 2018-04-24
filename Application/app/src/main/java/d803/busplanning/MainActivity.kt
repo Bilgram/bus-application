@@ -35,10 +35,10 @@ import java.text.SimpleDateFormat
 import kotlin.concurrent.thread
 
 
-class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+abstract class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
-    var activityReader: ActivityReader? = null
+    abstract var activityReader: ActivityReader
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,13 +67,20 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun registerGoogleActivity() {
-        val intent = Intent(this, ActivityDetection::class.java)
-        var nice = 0
-        val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val client = ActivityRecognition.getClient(this)
-        client.requestActivityUpdates(500, pendingIntent)
-        if (activityReader!!.ActivityType == "IN_VECHILE" && activityReader!!.values.first() > 80)
-            nice = 50
+            val intent = Intent(this, ActivityDetection::class.java)
+            val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+            val client = ActivityRecognition.getClient(this)
+            client.requestActivityUpdates(0, pendingIntent)
+            try {
+                if (activityReader.ActivityType == "STILL" && activityReader.values.first() > 80)
+                    Log.e("Det virker", "Der sker ting")
+            } catch (e: KotlinNullPointerException) {
+                e.stackTrace
+            }
+    }
+
+    fun onHandleIntent(intent: Intent) {
+            
     }
 
     override fun onConnectionSuspended(i: Int) {
