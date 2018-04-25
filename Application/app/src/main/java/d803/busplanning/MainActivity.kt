@@ -30,10 +30,13 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.android.UI
 import org.jetbrains.anko.coroutines.experimental.asReference
 import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.uiThread
 import org.json.JSONObject
+import org.w3c.dom.Text
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import java.lang.Long.MAX_VALUE
@@ -54,16 +57,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val progressBar = this.progressOverview
         updateProgressBar(progressBar)
         val ref = this.asReference()
-        val trip = doAsync {
-            val trip = calculatePath()
-            if (trip != null){
-               uiThread { updataUI(trip) }
-            }
-
-
-        }
-
-
+        val field = this.location
+        asyncAPICalls()
 
 
         mApiClient = GoogleApiClient.Builder(this)
@@ -74,30 +69,56 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
-    private fun updataUI(trip: Trip) {
+    private fun asyncAPICalls() {
+        val firstUpdate = async(CommonPool) {
+            calculatePath()
+        }
+        val runningTrip = async(UI) {
+            updateUI(firstUpdate.await())
+        }
+        launch(UI) {
+            doTrip(runningTrip.await())
+        }
+    }
+
+    private fun updateUI(trip: Trip?): Trip? {
         val locationField = this.location
-        locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
-        val from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
+        var fifteenMinNotifcation = false
+        var zeroMinNotfication = false
+        var commitedTrip: Trip? = null
         val timeField = this.time
-        val busField = this.time
-        var bus = trip.Leg.filter { l->l.type != "WALK"}.first()
+        val busField = this.bus
+        val activityField = this.activity
+        var from = SimpleDateFormat("hh:mm").parse(trip!!.Leg.first().Origin.time)
+        activityField.setText(trip.Leg.first().name)
+        var bus = trip.Leg.filter { l -> l.type != "WALK" }.first()
+
         busField.setText(bus.name)
         val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100) {
-            var minutesToBus = (from.time - getCurrentTime()) / 60000
-            runOnUiThread(){
-                timeField.setText(minutesToBus.toString())
-
-            }
-            if (minutesToBus >= 15){
-                sendNotification("gå","om 15 min")
-            }
-            if(minutesToBus >= 0){
-                sendNotification("gå","nu")
-
+            if (commitedTrip == null) {
+                var minutesToBus = (from.time - getCurrentTime()) / 60000
+                runOnUiThread {
+                    timeField.setText(minutesToBus.toString())
+                    locationField.setText(trip.Leg.first().Destination.name)
+                }
+                if (minutesToBus <= 15 && !fifteenMinNotifcation) {
+                    fifteenMinNotifcation = true
+                    sendNotification("gå", "om 15 min")
+                    commitedTrip = trip
+                }
+            } else {
+                var minutesToBus = (from.time - getCurrentTime()) / 60000
+                runOnUiThread { timeField.setText(minutesToBus.toString()) }
+                if (minutesToBus <= 0 && !zeroMinNotfication) {
+                    zeroMinNotfication = true
+                    sendNotification("gå", "nu")
+                    cancel()
+                }
             }
         }
-        fixedRateTimer.run{}
-        fixedRateTimer.cancel()
+        fixedRateTimer.run {}
+
+        return commitedTrip
     }
 
     override fun onConnected(bundle: Bundle?) {
@@ -133,7 +154,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
         val tripInfo = extractTripInfo(result)
         return tripInfo
-
     }
 
     private fun getCurrentTime(): Long {
@@ -146,14 +166,37 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
         val to = SimpleDateFormat("hh:mm").parse(currentHourMin)
         return to.time
+    }
 
+    private fun doTrip(trip: Trip?) {
+        val locationField = this.location
+        val timeField = this.time
+        val busField = this.bus
+        val bus = trip!!.Leg.filter { l -> l.type != "WALK" }.first()
+        busField.setText(bus.name)
+        val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100) {
+            if (trip.Leg.isEmpty()) {
+                cancel()
+            } else {
 
+                var from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
+                var minutesToNext = (from.time - getCurrentTime()) / 60000
+                runOnUiThread {
+                    timeField.setText(minutesToNext.toString())
+                    locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
+                }
+                if (minutesToNext >= 0) {
+                    trip.Leg.drop(1)
+                }
+
+            }
+        }.run {}
     }
 
     private fun extractTripInfo(pathInfo: String): Trip? {
         var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
-        val tripMetrics = "fastest"
+        val tripMetrics = "first"
         if (reader != null) {
             val triplist = reader.TripList
             val trips = triplist.Trip

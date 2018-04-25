@@ -3,8 +3,8 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/Application.iml" filepath="$PROJECT_DIR$/Application.iml" />
-      <module fileurl="file://C:/Development/DAT8/bus-application/Application/app/Application-app.iml" filepath="C:/Development/DAT8/bus-application/Application/app/Application-app.iml" />
-      <module fileurl="file://C:/Development/DAT8/bus-application/Application/app/Application-app~1.iml" filepath="C:/Development/DAT8/bus-application/Application/app/Application-app~1.iml" />
+      <module fileurl="file://C:\Development\DAT8\bus-application\Application\app\Application-app.iml" filepath="C:\Development\DAT8\bus-application\Application\app\Application-app.iml" />
+      <module fileurl="file://C:\Development\DAT8\bus-application\Application\app\Application-app~1.iml" filepath="C:\Development\DAT8\bus-application\Application\app\Application-app~1.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>
