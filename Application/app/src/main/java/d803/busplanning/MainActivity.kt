@@ -35,10 +35,9 @@ import java.text.SimpleDateFormat
 import kotlin.concurrent.thread
 
 
-abstract class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
-    private var activityReader: ActivityReader? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,11 +67,13 @@ abstract class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCal
 
     private fun registerGoogleActivity() {
             val intent = Intent(this, ActivityDetection::class.java)
+            val activityReader: ActivityReader? = null
             val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
             val client = ActivityRecognition.getClient(this)
             client.requestActivityUpdates(0, pendingIntent)
+
             try {
-                if (activityReader!!.ActivityType == "STILL" && activityReader!!.values.first() > 80)
+                if (activityReader!!.activityType == "STILL" && activityReader!!.values.first() > 80)
                     Log.e("Det virker", "Der sker ting")
             } catch (e: KotlinNullPointerException) {
                 e.stackTrace
