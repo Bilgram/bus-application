@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             updateUI(firstUpdate.await())
         }
         launch(UI) {
-            doTrip(runningTrip.await())
+            //doTrip(runningTrip.await())
         }
     }
 
@@ -117,8 +117,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
         }
         fixedRateTimer.run {}
-
+        
         return commitedTrip
+
     }
 
     override fun onConnected(bundle: Bundle?) {
