@@ -59,7 +59,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         doAsync {
             currentTrip = calculatePath()
             val trip = updateUI(currentTrip!!)
-            doTrip(trip)
+            if (trip != null)
+                doTrip(trip)
 
         }
 
@@ -74,7 +75,30 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
-    private fun doTrip(trip: Trip?) {
+    private fun doTrip(trip: Trip) {
+        val locationField = this.location
+        val timeField = this.time
+        val busField = this.bus
+        val bus = trip.Leg.filter { l->l.type != "WALK"}.first()
+        busField.setText(bus.name)
+        val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100){
+            if (trip.Leg.isEmpty()){
+                cancel()
+            }
+            else{
+
+                var from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
+                var minutesToNext = (from.time - getCurrentTime()) / 60000
+                runOnUiThread{
+                    timeField.setText(minutesToNext.toString())
+                    locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
+                }
+                if (minutesToNext >= 0){
+                    trip.Leg.drop(1)
+                }
+
+            }
+        }
 
     }
 
@@ -86,18 +110,17 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val timeField = this.time
         val busField = this.time
         var from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
-        var minutesToBus = (from.time - getCurrentTime()) / 60000
-        var bus = trip.Leg.filter { l->l.type != "WALK"}.first()
         val fixedRateTimer = fixedRateTimer(name = "UpdateUI", initialDelay = 100, period = 100) {
             if (commitedTrip == null) {
                 from = SimpleDateFormat("hh:mm").parse(trip.Leg.first().Origin.time)
-                minutesToBus = (from.time - getCurrentTime()) / 60000
-                locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
-                bus = trip.Leg.filter { l->l.type != "WALK"}.first()
-                runOnUiThread() {
+                var minutesToBus = (from.time - getCurrentTime()) / 60000
+                var bus = trip.Leg.filter { l->l.type != "WALK"}.first()
+                runOnUiThread {
                     timeField.setText(minutesToBus.toString())
                     busField.setText(bus.name)
+                    locationField.setText(trip.Leg.first().name + "\n " + trip.Leg.first().Destination.name)
                 }
+
                 if (minutesToBus >= 15 && !fifteenMinNotifcation) {
                     fifteenMinNotifcation = true
                     sendNotification("gå", "om 15 min")
@@ -106,8 +129,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
             }
             else {
-                minutesToBus = (from.time - getCurrentTime()) / 60000
-                runOnUiThread() { timeField.setText(minutesToBus.toString()) }
+                var minutesToBus = (from.time - getCurrentTime()) / 60000
+                runOnUiThread   {timeField.setText(minutesToBus.toString())}
                 if (minutesToBus >= 0 && !zeroMinNotfication) {
                     zeroMinNotfication = true
                     sendNotification("gå", "nu")
