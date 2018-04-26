@@ -1,0 +1,10 @@
+diff a/Application/app/src/main/java/d803/busplanning/MainActivity.kt b/Application/app/src/main/java/d803/busplanning/MainActivity.kt	(rejected hunks)
+@@ -101,7 +101,7 @@
+     }
+ 
+     override fun onConnected(bundle: Bundle?) {
+-        val intent = Intent(this, ActivityDetection::class.java)
++        vabl intent = Intent(this, ActivityDetection::class.java)
+         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+         val client = ActivityRecognition.getClient(this)
+         client.requestActivityUpdates(0, pendingIntent)
