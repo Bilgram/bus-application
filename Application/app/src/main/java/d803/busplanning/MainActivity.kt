@@ -38,7 +38,7 @@ import kotlin.concurrent.thread
 abstract class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
-    abstract var activityReader: ActivityReader
+    private var activityReader: ActivityReader? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,7 +72,7 @@ abstract class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCal
             val client = ActivityRecognition.getClient(this)
             client.requestActivityUpdates(0, pendingIntent)
             try {
-                if (activityReader.ActivityType == "STILL" && activityReader.values.first() > 80)
+                if (activityReader!!.ActivityType == "STILL" && activityReader!!.values.first() > 80)
                     Log.e("Det virker", "Der sker ting")
             } catch (e: KotlinNullPointerException) {
                 e.stackTrace

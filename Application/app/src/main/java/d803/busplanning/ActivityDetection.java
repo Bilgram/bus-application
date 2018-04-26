@@ -6,6 +6,7 @@ import com.google.android.gms.location.ActivityRecognitionResult;
 import com.google.android.gms.location.DetectedActivity;
 import java.io.IOException;
 import java.util.List;
+import d803.busplanning.ActivityDetection;
 
 public class ActivityDetection extends IntentService{
 
