@@ -17,17 +17,11 @@ import android.location.Geocoder
 import android.location.LocationManager
 import android.location.Location
 import android.location.LocationListener
-import android.widget.TextView
 import android.widget.ProgressBar
 import org.json.JSONArray
 import JSON.TripClass
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
-import android.os.Handler
-import android.text.TextUtils.isEmpty
-import android.view.View
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
@@ -36,17 +30,11 @@ import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.NonCancellable.cancel
 import kotlinx.coroutines.experimental.android.UI
-import org.jetbrains.anko.coroutines.experimental.asReference
-import org.jetbrains.anko.doAsync
-import org.jetbrains.anko.uiThread
 import org.json.JSONObject
-import org.w3c.dom.Text
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import java.lang.Long.MAX_VALUE
-import java.lang.Runnable
 import java.text.SimpleDateFormat
-import kotlin.concurrent.thread
 
 
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
@@ -78,6 +66,14 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         launch(UI) {
             updateUI(firstUpdate.await())
             doTrip(firstUpdate.await())
+        }
+    }
+    private fun asyncAPICallsWithoutTripCalculation(){
+        val firstUpdate = async(CommonPool) {
+            calculatePath()
+        }
+        launch(UI) {
+            updateUI(firstUpdate.await())
         }
     }
 
@@ -115,7 +111,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     }
                     updateUI(trip)
                 }
-                delay(600)
+                delay(6000)
             }
             cancel()
         }
@@ -167,7 +163,7 @@ private fun getCurrentTime(): Long {
     } else {
         currentHourMin = current.hours.toString() + ":" + current.minutes.toString()
     }
-    val to = SimpleDateFormat("hh:mm").parse(currentHourMin)
+    val to = SimpleDateFormat("HH:mm").parse(currentHourMin)
     return to.time
 }
 
@@ -270,6 +266,7 @@ fun createColor(): PorterDuffColorFilter {
 private val locationListener: LocationListener = object : LocationListener {
     override fun onLocationChanged(location: Location) {
         sendNotification(location.latitude.toString(), location.toString())
+        asyncAPICallsWithoutTripCalculation()
     }
 
     override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
