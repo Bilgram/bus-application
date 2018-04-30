@@ -99,10 +99,17 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private fun doTrip(trip: Trip?) {
         var tripTime = trip!!.getDuration()
+        var location = trip.Leg.first().Destination.name
         launch(UI) {
             for (i in tripTime downTo 0) {
                 val time = getTime(trip.Leg.first())
                 updateTime(time)
+                if (time.equals(15)) {
+                    sendNotification("15 minutter til at skulle gå", location)
+                }
+                if (time.equals(0)){
+                    sendNotification("Gå nu til", location)
+                }
                 if (time <= 150) {
                     // giver tom trip ved sidste element
                     trip.Leg = trip.Leg.drop(1)
@@ -116,8 +123,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             cancel()
         }
     }
-
-
 
 override fun onConnected(bundle: Bundle?) {
     val intent = Intent(this, ActivityDetection::class.java)
@@ -265,7 +270,7 @@ fun createColor(): PorterDuffColorFilter {
 
 private val locationListener: LocationListener = object : LocationListener {
     override fun onLocationChanged(location: Location) {
-        sendNotification(location.latitude.toString(), location.toString())
+        //sendNotification(location.latitude.toString(), location.toString())
         asyncAPICallsWithoutTripCalculation()
     }
 
