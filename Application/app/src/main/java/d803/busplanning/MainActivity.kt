@@ -99,16 +99,29 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private fun doTrip(trip: Trip?) {
         var tripTime = trip!!.getDuration()
-        var location = trip.Leg.first().Destination.name
+        var busstop = trip.Leg.first().Destination.name
+        var address = ""
+        try {
+            val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            val geoCoder = Geocoder(this, Locale.getDefault())
+            address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
+        } catch (ex: SecurityException) {
+            address = "Selma Lagerløfsvej 23"
+            Log.d("myTag", "Security Exception, no location available");
+        }
+
         launch(UI) {
             for (i in tripTime downTo 0) {
                 val time = getTime(trip.Leg.first())
                 updateTime(time)
-                if (time.equals(15)) {
-                    sendNotification("15 minutter til at skulle gå", location)
+                if (time.toInt() == 15) {
+                    sendNotification("15 minutter til at skulle gå til", busstop)
                 }
-                if (time.equals(0)){
-                    sendNotification("Gå nu til", location)
+                if (busstop == address){
+                    sendNotification("Du er ved stoppestedet",busstop)
+                }
+                if (time.toInt() == 0){
+                    sendNotification("Gå nu til", busstop)
                 }
                 if (time <= 150) {
                     // giver tom trip ved sidste element
@@ -270,7 +283,6 @@ fun createColor(): PorterDuffColorFilter {
 
 private val locationListener: LocationListener = object : LocationListener {
     override fun onLocationChanged(location: Location) {
-        //sendNotification(location.latitude.toString(), location.toString())
         asyncAPICallsWithoutTripCalculation()
     }
 
