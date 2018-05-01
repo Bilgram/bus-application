@@ -1,6 +1,7 @@
 package d803.busplanning
 
 import JSON.Leg
+import d803.busplanning.ActivityReader
 import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -139,6 +140,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
 override fun onConnected(bundle: Bundle?) {
     val intent = Intent(this, ActivityDetection::class.java)
+    val activityReader = null
     val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
     val client = ActivityRecognition.getClient(this)
     client.requestActivityUpdates(0, pendingIntent)

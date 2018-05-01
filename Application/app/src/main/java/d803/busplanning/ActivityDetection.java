@@ -8,6 +8,8 @@ import com.google.android.gms.location.DetectedActivity;
 import java.util.List;
 
 public class ActivityDetection extends IntentService{
+    public String value = "";
+
 
     public ActivityDetection(){
         super("Hvad med fucking ja!");
@@ -22,38 +24,39 @@ public class ActivityDetection extends IntentService{
     }
 
     private void handleDetectedActivities(List<DetectedActivity> probableActivities) {
+
         for( DetectedActivity activity : probableActivities ) {
             switch( activity.getType() ) {
                 case DetectedActivity.IN_VEHICLE: {
-                    Log.e( "ActivityRecogition", "In Vehicle: " + activity.getConfidence() );
+                    value = "IN_VEHICLE";
                     break;
                 }
                 case DetectedActivity.ON_BICYCLE: {
-                    Log.e( "ActivityRecogition", "On Bicycle: " + activity.getConfidence() );
+                    new ActivityReader("ON_BICYCLE", activity.getConfidence());
                     break;
                 }
                 case DetectedActivity.ON_FOOT: {
-                    Log.e( "ActivityRecogition", "On Foot: " + activity.getConfidence() );
+                    new ActivityReader("ON_FOOT", activity.getConfidence());
                     break;
                 }
                 case DetectedActivity.RUNNING: {
-                    Log.e( "ActivityRecogition", "Running: " + activity.getConfidence() );
+                    new ActivityReader("RUNNING", activity.getConfidence());
                     break;
                 }
                 case DetectedActivity.STILL: {
-                    Log.e( "ActivityRecogition", "Still: " + activity.getConfidence() );
+                    new ActivityReader("STILL", activity.getConfidence());
                     break;
                 }
                 case DetectedActivity.TILTING: {
-                    Log.e( "ActivityRecogition", "Tilting: " + activity.getConfidence() );
+                    new ActivityReader("TILTING", activity.getConfidence());
                     break;
                 }
                 case DetectedActivity.WALKING: {
-                    Log.e( "ActivityRecogition", "Walking: " + activity.getConfidence() );
+                    new ActivityReader("WALKING", activity.getConfidence());
                     break;
                 }
                 case DetectedActivity.UNKNOWN: {
-                    Log.e( "ActivityRecogition", "Unknown: " + activity.getConfidence() );
+                    new ActivityReader("UNKNOWN", activity.getConfidence());
                     break;
                 }
             }
