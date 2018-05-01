@@ -106,7 +106,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             for (i in tripTime downTo 0) {
                 try {
                     if (startLocation != locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)){
-                        cancel()
+                        break
                     }
                 } catch (ex: SecurityException) {
                     Log.d("myTag", "Security Exception, no location available");
@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 if (time.equals(0)){
                     sendNotification("Gå nu til", location)
                 }
-                if (time <= 0) {
+                if (time <= 15) {
                     // giver tom trip ved sidste element
                     trip.Leg = trip.Leg.drop(1)
                     if (trip.Leg.isEmpty()) {
