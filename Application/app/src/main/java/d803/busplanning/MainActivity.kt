@@ -71,6 +71,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
+// Used for overview button
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu, menu)
         return super.onCreateOptionsMenu(menu)
@@ -87,6 +88,13 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         else -> super.onOptionsItemSelected(item)
     }
 
+    private fun updateOverview(trip: Trip?){//Dangerous when less than three elements
+        this.walkBegin.setText(trip!!.Leg[0].Origin.time)
+        this.busBegin.setText(trip.Leg[1].Origin.time)
+        this.walkBeginLast.setText(trip.Leg[2].Origin.time)
+        this.destination.setText(trip.Leg[2].Destination.time)
+    }
+
     // handle button activities
     private fun asyncAPICalls() {
         val firstUpdate = async(CommonPool) {
@@ -94,6 +102,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
         launch(UI) {
             updateUI(firstUpdate.await())
+            updateOverview(firstUpdate.await())
             doTrip(firstUpdate.await())
         }
     }
@@ -124,7 +133,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             for (i in tripTime downTo 0) {
                 val time = getTime(trip.Leg.first())
                 updateTime(time)
-                if (time <= 150) {
+                if (time <= 0) {
                     // giver tom trip ved sidste element
                     trip.Leg = trip.Leg.drop(1)
                     if (trip.Leg.isEmpty()) {
@@ -132,7 +141,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     }
                     updateUI(trip)
                 }
-                delay(600)
+                delay(60000)
             }
             cancel()
         }
@@ -162,7 +171,7 @@ private fun calculatePath(): Trip? {
         val geoCoder = Geocoder(this, Locale.getDefault())
         address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
     } catch (ex: SecurityException) {
-        address = "Selma Lagerløfsvej 23"
+        address = "Selma Lagerløfsvej 300"
         Log.d("myTag", "Security Exception, no location available");
     }
     val startCordinates = getXYCordinates(address)
