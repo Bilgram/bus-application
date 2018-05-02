@@ -110,9 +110,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private fun updateUI(trip: Trip?) {
 
-        var activityType = this.activity.setText(trip!!.Leg.first().name)
+        var activityType = trip!!.Leg.first().name
         var compaireType = "til fods"
-        if(activityType.equals(compaireType)){
+        if(activityType == compaireType){
             this.activity.setText("Gå til")
         }
         if ((trip.Leg.first().type == "WALK") && (trip.Leg.size == 1)) {

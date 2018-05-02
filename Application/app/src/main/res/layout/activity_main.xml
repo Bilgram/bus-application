@@ -157,7 +157,7 @@
         android:background="@drawable/rectangle"
         android:gravity="center"
         android:textColor="#000000"
-        android:textSize="30px"
+        android:textSize="50px"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.503"
