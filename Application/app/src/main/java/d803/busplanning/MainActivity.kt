@@ -57,23 +57,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
-    // Used for overview button
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu, menu)
-        return super.onCreateOptionsMenu(menu)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
-        R.id.overview -> {
-            val intent = Intent(this, OverviewActivity::class.java)
-            val trip: Trip? = calculatePath()
-            intent.putExtra("trip", trip) //hjælp, måske skal hele klassen serializaes. Et andet gæt på crash kan være fordi trip er tom, da vi ikke venter på den(Tror dette er meget sandsynligt)
-            startActivity(intent)
-            true
-        }
-        else -> super.onOptionsItemSelected(item)
-    }
-
     private fun updateOverview(trip: Trip?) {//Dangerous when less than three elements
         this.walkBegin.setText(trip!!.Leg[0].Origin.time)
         this.busBegin.setText(trip.Leg[1].Origin.time)
@@ -152,10 +135,10 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     updateTime(time)
                 }
 
-                if (time.equals(15)) {
+                if (time.toInt() == 15) {
                     sendNotification("15 minutter til at skulle gå", location)
                 }
-                if (time.equals(0)) {
+                if (time.toInt() == 0) {
                     sendNotification("Gå nu til", location)
                 }
                 if (time <= 150) {
