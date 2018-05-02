@@ -35,6 +35,7 @@ import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.NonCancellable.cancel
 import kotlinx.coroutines.experimental.android.UI
+import org.jetbrains.anko.act
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
@@ -108,7 +109,12 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun updateUI(trip: Trip?) {
-        this.activity.setText(trip!!.Leg.first().name)
+
+        var activityType = this.activity.setText(trip!!.Leg.first().name)
+        var compaireType = "til fods"
+        if(activityType.equals(compaireType)){
+            this.activity.setText("Gå til")
+        }
         if ((trip.Leg.first().type == "WALK") && (trip.Leg.size == 1)) {
             this.bus.setText(" ")
         } else {
