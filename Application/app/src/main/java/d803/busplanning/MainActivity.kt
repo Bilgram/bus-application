@@ -1,6 +1,5 @@
 package d803.busplanning
 
-import JSON.Leg
 import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -17,16 +16,10 @@ import android.location.Geocoder
 import android.location.LocationManager
 import android.location.Location
 import android.location.LocationListener
-import android.widget.ProgressBar
 import org.json.JSONArray
 import JSON.TripClass
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.os.Handler
-import android.text.TextUtils.isEmpty
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
@@ -35,11 +28,9 @@ import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.NonCancellable.cancel
 import kotlinx.coroutines.experimental.android.UI
-import org.jetbrains.anko.act
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
-import kotlin.math.abs
 import java.lang.Long.MAX_VALUE
 import java.lang.Math.abs
 import java.text.SimpleDateFormat
@@ -111,21 +102,20 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     private fun updateUI(trip: Trip?) {
 
         var activityType = trip!!.Leg.first().name
-        var compaireType = "til fods"
-        if(activityType == compaireType){
+        if(activityType == "til fods"){
             this.activity.setText("Gå til")
-        }
-        if ((trip.Leg.first().type == "WALK") && (trip.Leg.size == 1)) {
             this.bus.setText(" ")
-        } else {
+        }
+        else{
+            this.activity.setText("Stå af ved")
             val bus = trip.Leg.filter { l -> l.type != "WALK" }
             this.bus.setText(bus.first().name)
         }
         this.location.setText(trip.Leg.first().Destination.name)
     }
 
-    private fun getTime(leg: Leg?): Long {
-        val from: Date = SimpleDateFormat("HH:mm").parse(leg!!.Origin.time)
+    private fun getTime(time: String): Long {
+        val from: Date = SimpleDateFormat("HH:mm").parse(time)
         return (from.time - getCurrentTime()) / 60000
     }
 
@@ -136,9 +126,11 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         } catch (ex: SecurityException) {
             Log.d("myTag", "Security Exception, no location available");
         }
-
+        val originaltrip = trip!!.Leg.first()
         var tripTime = trip!!.getDuration()
         var location = trip.Leg.first().Destination.name
+        var tripStarted = false
+        var time :Long= 1
         launch(UI) {
             for (i in tripTime downTo 0) {
                 try {
@@ -151,8 +143,15 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     Log.d("myTag", "Security Exception, no location available");
 
                 }
-                val time = getTime(trip.Leg.first())
-                updateTime(time)
+                if (!tripStarted){
+                    time = getTime(trip.Leg.first().Origin.time)
+                    updateTime(time)
+                }
+                else{
+                    time = getTime(trip.Leg.first().Destination.time)
+                    updateTime(time)
+                }
+
                 if (time.equals(15)) {
                     sendNotification("15 minutter til at skulle gå", location)
                 }
@@ -161,11 +160,18 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 }
                 if (time <= 150) {
                     // giver tom trip ved sidste element
-                    trip.Leg = trip.Leg.drop(1)
+
                     if (trip.Leg.isEmpty()) {
                         break
                     }
                     updateUI(trip)
+                    if (tripStarted) {
+                        trip.Leg = trip.Leg.drop(1)
+                    }
+                    else {
+                        tripStarted = true
+                    }
+
                 }
                 delay(60000)
             }
