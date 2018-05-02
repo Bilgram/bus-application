@@ -93,9 +93,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             calculatePath()
         }
         launch(UI) {
+            doTrip(firstUpdate.await())
             updateUI(firstUpdate.await())
             updateOverview(firstUpdate.await())
-            doTrip(firstUpdate.await())
         }
 
     }
@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 if (time.equals(0)){
                     sendNotification("Gå nu til", location)
                 }
-                if (time <= 15) {
+                if (time <= 150) {
                     // giver tom trip ved sidste element
                     trip.Leg = trip.Leg.drop(1)
                     if (trip.Leg.isEmpty()) {
