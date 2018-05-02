@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         updateProgressBar(progressBar)
         asyncAPICalls()
 
+
         mApiClient = GoogleApiClient.Builder(this)
                 .addApi(ActivityRecognition.API)
                 .addConnectionCallbacks(this)
@@ -67,15 +68,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             updateUI(firstUpdate.await())
             doTrip(firstUpdate.await())
         }
+
     }
-    private fun asyncAPICallsWithoutTripCalculation(){
-        val firstUpdate = async(CommonPool) {
-            calculatePath()
-        }
-        launch(UI) {
-            updateUI(firstUpdate.await())
-        }
-    }
+
 
     private fun updateTime(time: Long) {
         this.time.setText(time.toString())
@@ -98,32 +93,34 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun doTrip(trip: Trip?) {
-        var tripTime = trip!!.getDuration()
-        var busstop = trip.Leg.first().Destination.name
-        var address = ""
+        var startLocation:Location? = null
         try {
-            val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            val geoCoder = Geocoder(this, Locale.getDefault())
-            address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
+            startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         } catch (ex: SecurityException) {
-            address = "Selma Lagerløfsvej 23"
             Log.d("myTag", "Security Exception, no location available");
         }
 
+        var tripTime = trip!!.getDuration()
+        var location = trip.Leg.first().Destination.name
         launch(UI) {
             for (i in tripTime downTo 0) {
+                try {
+                    if (startLocation != locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)){
+                        break
+                    }
+                } catch (ex: SecurityException) {
+                    Log.d("myTag", "Security Exception, no location available");
+                }
+
                 val time = getTime(trip.Leg.first())
                 updateTime(time)
-                if (time.toInt() == 15) {
-                    sendNotification("15 minutter til at skulle gå til", busstop)
+                if (time.equals(15)) {
+                    sendNotification("15 minutter til at skulle gå", location)
                 }
-                if (busstop == address){
-                    sendNotification("Du er ved stoppestedet",busstop)
+                if (time.equals(0)){
+                    sendNotification("Gå nu til", location)
                 }
-                if (time.toInt() == 0){
-                    sendNotification("Gå nu til", busstop)
-                }
-                if (time <= 150) {
+                if (time <= 15) {
                     // giver tom trip ved sidste element
                     trip.Leg = trip.Leg.drop(1)
                     if (trip.Leg.isEmpty()) {
@@ -131,7 +128,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     }
                     updateUI(trip)
                 }
-                delay(6000)
+                delay(60000)
             }
             cancel()
         }
@@ -161,7 +158,7 @@ private fun calculatePath(): Trip? {
         val geoCoder = Geocoder(this, Locale.getDefault())
         address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
     } catch (ex: SecurityException) {
-        address = "Selma Lagerløfsvej 23"
+        address = "Selma Lagerløfsvej 300"
         Log.d("myTag", "Security Exception, no location available");
     }
     val startCordinates = getXYCordinates(address)
@@ -237,7 +234,7 @@ private fun getLocation() {
         locationManager = applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     try {
         // Request location updates
-        locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 10f, locationListener);
+        locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 50f, locationListener);
     } catch (ex: SecurityException) {
         Log.d("myTag", "Security Exception, no location available");
     }
@@ -282,8 +279,12 @@ fun createColor(): PorterDuffColorFilter {
 }
 
 private val locationListener: LocationListener = object : LocationListener {
+    var trip:Trip? = null
+    fun returnTrip(): Trip? {return trip}
     override fun onLocationChanged(location: Location) {
-        asyncAPICallsWithoutTripCalculation()
+        asyncAPICalls()
+
+
     }
 
     override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
