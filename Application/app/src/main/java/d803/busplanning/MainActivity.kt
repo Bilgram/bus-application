@@ -38,7 +38,9 @@ import kotlinx.coroutines.experimental.android.UI
 import org.json.JSONObject
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
+import kotlin.math.abs
 import java.lang.Long.MAX_VALUE
+import java.lang.Math.abs
 import java.text.SimpleDateFormat
 
 
@@ -63,7 +65,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
-// Used for overview button
+    // Used for overview button
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu, menu)
         return super.onCreateOptionsMenu(menu)
@@ -72,7 +74,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
         R.id.overview -> {
             val intent = Intent(this, OverviewActivity::class.java)
-            val trip:Trip? = calculatePath()
+            val trip: Trip? = calculatePath()
             intent.putExtra("trip", trip) //hjælp, måske skal hele klassen serializaes. Et andet gæt på crash kan være fordi trip er tom, da vi ikke venter på den(Tror dette er meget sandsynligt)
             startActivity(intent)
             true
@@ -80,7 +82,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         else -> super.onOptionsItemSelected(item)
     }
 
-    private fun updateOverview(trip: Trip?){//Dangerous when less than three elements
+    private fun updateOverview(trip: Trip?) {//Dangerous when less than three elements
         this.walkBegin.setText(trip!!.Leg[0].Origin.time)
         this.busBegin.setText(trip.Leg[1].Origin.time)
         this.walkBeginLast.setText(trip.Leg[2].Origin.time)
@@ -122,7 +124,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun doTrip(trip: Trip?) {
-        var startLocation:Location? = null
+        var startLocation: Location? = null
         try {
             startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         } catch (ex: SecurityException) {
@@ -134,19 +136,21 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         launch(UI) {
             for (i in tripTime downTo 0) {
                 try {
-                    if (startLocation != locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)){
+                    val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                    if ((abs(startLocation!!.longitude - locationCheck.longitude) >= 1) || (abs((startLocation?.latitude!! - locationCheck.latitude)) >= 1)) {
                         break
                     }
-                } catch (ex: SecurityException) {
+                } catch
+                (ex: SecurityException) {
                     Log.d("myTag", "Security Exception, no location available");
-                }
 
+                }
                 val time = getTime(trip.Leg.first())
                 updateTime(time)
                 if (time.equals(15)) {
                     sendNotification("15 minutter til at skulle gå", location)
                 }
-                if (time.equals(0)){
+                if (time.equals(0)) {
                     sendNotification("Gå nu til", location)
                 }
                 if (time <= 150) {
@@ -163,153 +167,149 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
     }
 
-override fun onConnected(bundle: Bundle?) {
-    val intent = Intent(this, ActivityDetection::class.java)
-    val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-    val client = ActivityRecognition.getClient(this)
-    client.requestActivityUpdates(0, pendingIntent)
-}
-
-override fun onConnectionSuspended(i: Int) {
-    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-}
-
-override fun onConnectionFailed(connectionResult: ConnectionResult) {
-    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-}
-
-private fun calculatePath(): Trip? {
-    val customLocation = "Aalborg busterminal"
-    val destCordinates = getXYCordinates(customLocation)
-    var address = ""
-    try {
-        val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-        val geoCoder = Geocoder(this, Locale.getDefault())
-        address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
-    } catch (ex: SecurityException) {
-        address = "Selma Lagerløfsvej 300"
-        Log.d("myTag", "Security Exception, no location available");
+    override fun onConnected(bundle: Bundle?) {
+        val intent = Intent(this, ActivityDetection::class.java)
+        val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val client = ActivityRecognition.getClient(this)
+        client.requestActivityUpdates(0, pendingIntent)
     }
-    val startCordinates = getXYCordinates(address)
-    //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
-    val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
-            "originCoordName=" + address.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
-            "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
-    val tripInfo = extractTripInfo(result)
-    return tripInfo
-}
 
-private fun getCurrentTime(): Long {
-    val current = java.util.Calendar.getInstance().getTime()
-    var currentHourMin = ""
-    if (current.minutes < 10) {
-        currentHourMin = current.hours.toString() + ":" + "0" + current.minutes.toString()
-    } else {
-        currentHourMin = current.hours.toString() + ":" + current.minutes.toString()
+    override fun onConnectionSuspended(i: Int) {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
-    val to = SimpleDateFormat("HH:mm").parse(currentHourMin)
-    return to.time
-}
+
+    override fun onConnectionFailed(connectionResult: ConnectionResult) {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    private fun calculatePath(): Trip? {
+        val customLocation = "Aalborg busterminal"
+        val destCordinates = getXYCordinates(customLocation)
+        var address = ""
+        try {
+            val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            val geoCoder = Geocoder(this, Locale.getDefault())
+            address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
+        } catch (ex: SecurityException) {
+            address = "Selma Lagerløfsvej 300"
+            Log.d("myTag", "Security Exception, no location available");
+        }
+        val startCordinates = getXYCordinates(address)
+        //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
+        val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
+                "originCoordName=" + address.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
+                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+        val tripInfo = extractTripInfo(result)
+        return tripInfo
+    }
+
+    private fun getCurrentTime(): Long {
+        val current = java.util.Calendar.getInstance().getTime()
+        var currentHourMin = ""
+        if (current.minutes < 10) {
+            currentHourMin = current.hours.toString() + ":" + "0" + current.minutes.toString()
+        } else {
+            currentHourMin = current.hours.toString() + ":" + current.minutes.toString()
+        }
+        val to = SimpleDateFormat("HH:mm").parse(currentHourMin)
+        return to.time
+    }
 
 
-private fun extractTripInfo(pathInfo: String): Trip? {
-    var bestTime = MAX_VALUE
-    val reader = Klaxon().parse<TripClass>(pathInfo)
-    val tripMetrics = "first"
-    if (reader != null) {
-        val triplist = reader.TripList
-        val trips = triplist.Trip
-        var bestTrip = trips.first()
+    private fun extractTripInfo(pathInfo: String): Trip? {
+        var bestTime = MAX_VALUE
+        val reader = Klaxon().parse<TripClass>(pathInfo)
+        val tripMetrics = "first"
+        if (reader != null) {
+            val triplist = reader.TripList
+            val trips = triplist.Trip
+            var bestTrip = trips.first()
 
-        if (tripMetrics == "first") {
-            return bestTrip
-        } else if (tripMetrics == "fastest") {
-            for (trip in trips) {
-                if (trip.getDuration() < bestTime) {
-                    bestTime = trip.getDuration()
-                    bestTrip = trip
+            if (tripMetrics == "first") {
+                return bestTrip
+            } else if (tripMetrics == "fastest") {
+                for (trip in trips) {
+                    if (trip.getDuration() < bestTime) {
+                        bestTime = trip.getDuration()
+                        bestTrip = trip
+                    }
                 }
             }
+            return bestTrip
         }
-        return bestTrip
+        return null
     }
-    return null
-}
 
-private fun getXYCordinates(place: String): List<String> {
-    val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=" + place + "&format=json").readText()
-    val reader = JSONObject(result)
-    val locationlist = reader.getJSONObject("LocationList")
-    var keys = locationlist.keys()
-    //rigtig grim måde at gøre det på måske
-    keys.next()//nonamespaceshemalocation
-    val str = keys.next()//coordlocation eller stoplocation
-    val test = locationlist.get(str)
-    if (test is JSONArray) {
-        val coordLocation = locationlist.getJSONArray(str)
-        val getResult = coordLocation.getJSONObject(0)
+    private fun getXYCordinates(place: String): List<String> {
+        val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=" + place + "&format=json").readText()
+        val reader = JSONObject(result)
+        val locationlist = reader.getJSONObject("LocationList")
+        var keys = locationlist.keys()
+        //rigtig grim måde at gøre det på måske
+        keys.next()//nonamespaceshemalocation
+        val str = keys.next()//coordlocation eller stoplocation
+        val test = locationlist.get(str)
+        if (test is JSONArray) {
+            val coordLocation = locationlist.getJSONArray(str)
+            val getResult = coordLocation.getJSONObject(0)
+            val x = getResult.getString("x")
+            val y = getResult.getString("y")
+            return listOf<String>(x, y)
+        }
+        val getResult = locationlist.getJSONObject(str)
         val x = getResult.getString("x")
         val y = getResult.getString("y")
         return listOf<String>(x, y)
     }
-    val getResult = locationlist.getJSONObject(str)
-    val x = getResult.getString("x")
-    val y = getResult.getString("y")
-    return listOf<String>(x, y)
-}
 
-private fun getLocation() {
-    if (locationManager == null)
-        locationManager = applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    try {
-        // Request location updates
-        locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 50f, locationListener);
-    } catch (ex: SecurityException) {
-        Log.d("myTag", "Security Exception, no location available");
-    }
-}
-
-override fun onStop() {
-    super.onStop()
-    var title = "hej"
-    val fixedRateTimer = fixedRateTimer(name = "kappa", initialDelay = 100, period = 100) {
-        //sendNotification(title,"Body")
-        title = title + "j"
-    }
-}
-
-fun sendNotification(title: String, body: String) {
-    val intent = Intent()
-    val pendingIntent = PendingIntent.getActivity(this@MainActivity, 0, intent, 0)
-    val notification = Notification.Builder(this@MainActivity) //https://stackoverflow.com/questions/45462666/notificationcompat-builder-deprecated-in-android-o?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-            .setTicker("")
-            .setContentTitle(title)
-            .setContentText(body)
-            .setSmallIcon(R.drawable.notification_template_icon_bg)
-            .setContentIntent(pendingIntent).notification
-    notification.flags = Notification.FLAG_AUTO_CANCEL
-    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    notificationManager.notify(0, notification)
-}
-
-private val locationListener: LocationListener = object : LocationListener {
-    var trip:Trip? = null
-    fun returnTrip(): Trip? {return trip}
-    override fun onLocationChanged(location: Location) {
-        asyncAPICalls()
-
-
+    private fun getLocation() {
+        if (locationManager == null)
+            locationManager = applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        try {
+            // Request location updates
+            locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 50f, locationListener);
+        } catch (ex: SecurityException) {
+            Log.d("myTag", "Security Exception, no location available");
+        }
     }
 
-    override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
-    override fun onProviderEnabled(provider: String) {}
-    override fun onProviderDisabled(provider: String) {}
-}
-/** base url http://xmlopen.rejseplanen.dk/bin/rest.exe
-url format
-http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
-destCoordY=<yInteger>&destCoordName=<NameOfDestination>&date=
-19.09.10&time=07:02&useBus=0*/
+    override fun onStop() {
+        super.onStop()
+        var title = "hej"
+        val fixedRateTimer = fixedRateTimer(name = "kappa", initialDelay = 100, period = 100) {
+            //sendNotification(title,"Body")
+            title = title + "j"
+        }
+    }
+
+    fun sendNotification(title: String, body: String) {
+        val intent = Intent()
+        val pendingIntent = PendingIntent.getActivity(this@MainActivity, 0, intent, 0)
+        val notification = Notification.Builder(this@MainActivity) //https://stackoverflow.com/questions/45462666/notificationcompat-builder-deprecated-in-android-o?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+                .setTicker("")
+                .setContentTitle(title)
+                .setContentText(body)
+                .setSmallIcon(R.drawable.notification_template_icon_bg)
+                .setContentIntent(pendingIntent).notification
+        notification.flags = Notification.FLAG_AUTO_CANCEL
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(0, notification)
+    }
+
+    private val locationListener: LocationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            asyncAPICalls()
+        }
+
+        override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
+        override fun onProviderEnabled(provider: String) {}
+        override fun onProviderDisabled(provider: String) {}
+    }
+    /** base url http://xmlopen.rejseplanen.dk/bin/rest.exe
+    url format
+    http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
+    destCoordY=<yInteger>&destCoordName=<NameOfDestination>&date=
+    19.09.10&time=07:02&useBus=0*/
 }
 
 
