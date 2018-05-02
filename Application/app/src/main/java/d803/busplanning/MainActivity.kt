@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             for (i in tripTime downTo 0) {
                 try {
                     val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                    if ((abs(startLocation!!.longitude - locationCheck.longitude) >= 1) || (abs((startLocation?.latitude!! - locationCheck.latitude)) >= 1)) {
+                    if ((abs(startLocation!!.distanceTo(locationCheck)) >= 50)) {
                         break
                     }
                 } catch
