@@ -22,6 +22,11 @@ import org.json.JSONArray
 import JSON.TripClass
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
+import android.os.Handler
+import android.text.TextUtils.isEmpty
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
@@ -47,8 +52,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         getLocation()
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
 
-        val progressBar = this.progressOverview
-        updateProgressBar(progressBar)
         asyncAPICalls()
 
 
@@ -60,12 +63,38 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
+// Used for overview button
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.overview -> {
+            val intent = Intent(this, OverviewActivity::class.java)
+            val trip:Trip? = calculatePath()
+            intent.putExtra("trip", trip) //hjælp, måske skal hele klassen serializaes. Et andet gæt på crash kan være fordi trip er tom, da vi ikke venter på den(Tror dette er meget sandsynligt)
+            startActivity(intent)
+            true
+        }
+        else -> super.onOptionsItemSelected(item)
+    }
+
+    private fun updateOverview(trip: Trip?){//Dangerous when less than three elements
+        this.walkBegin.setText(trip!!.Leg[0].Origin.time)
+        this.busBegin.setText(trip.Leg[1].Origin.time)
+        this.walkBeginLast.setText(trip.Leg[2].Origin.time)
+        this.destination.setText(trip.Leg[2].Destination.time)
+    }
+
+    // handle button activities
     private fun asyncAPICalls() {
         val firstUpdate = async(CommonPool) {
             calculatePath()
         }
         launch(UI) {
             updateUI(firstUpdate.await())
+            updateOverview(firstUpdate.await())
             doTrip(firstUpdate.await())
         }
 
@@ -261,21 +290,6 @@ fun sendNotification(title: String, body: String) {
     notification.flags = Notification.FLAG_AUTO_CANCEL
     val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     notificationManager.notify(0, notification)
-}
-
-fun updateProgressBar(progressBar: ProgressBar) {
-    runOnUiThread {
-        val drawable = progressBar.progressDrawable
-        drawable.colorFilter = createColor()
-        progressBar.setProgressDrawable(drawable)
-        progressBar.progress = 50
-    }
-}
-
-fun createColor(): PorterDuffColorFilter {
-    val color = android.graphics.Color.argb(255, 153, 153, 153)
-    val colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY)
-    return colorFilter
 }
 
 private val locationListener: LocationListener = object : LocationListener {

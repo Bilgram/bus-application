@@ -1,12 +1,12 @@
 package JSON
 
+import java.io.Serializable
 import java.text.SimpleDateFormat
 import java.util.Date;
 
 data class TripClass(
         val TripList: TripList
 )
-
 
 data class TripList(
         val noNamespaceSchemaLocation: String,
@@ -15,7 +15,7 @@ data class TripList(
 
 data class Trip(
         var Leg: List<Leg>
-) {
+): Serializable {
     fun getDuration(): Long {
         val seconds = 1000
         val to = SimpleDateFormat("HH:mm").parse(Leg.last().Destination.time)
@@ -23,7 +23,6 @@ data class Trip(
         val result = to.time - from.time
         return result / seconds
     }
-
 }
 
 data class Leg(
