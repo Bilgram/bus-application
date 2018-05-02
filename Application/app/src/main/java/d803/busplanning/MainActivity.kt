@@ -132,7 +132,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         var tripStarted = false
         var time :Long= 1
         launch(UI) {
-            for (i in tripTime downTo 0) {
+            while (!trip.Leg.isEmpty()) {
                 try {
                     val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                     if ((abs(startLocation!!.distanceTo(locationCheck)) >= 50)) {
@@ -161,9 +161,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 if (time <= 150) {
                     // giver tom trip ved sidste element
 
-                    if (trip.Leg.isEmpty()) {
-                        break
-                    }
                     updateUI(trip)
                     if (tripStarted) {
                         trip.Leg = trip.Leg.drop(1)
@@ -171,7 +168,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     else {
                         tripStarted = true
                     }
-
                 }
                 delay(60000)
             }
