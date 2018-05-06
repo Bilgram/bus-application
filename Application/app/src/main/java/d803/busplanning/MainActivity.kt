@@ -18,6 +18,10 @@ import android.location.Location
 import android.location.LocationListener
 import org.json.JSONArray
 import JSON.TripClass
+import android.app.SharedElementCallback
+import android.content.SharedPreferences
+import android.text.SpannableString
+import android.text.style.RelativeSizeSpan
 import android.view.Menu
 import android.view.MenuItem
 import com.beust.klaxon.Klaxon
@@ -46,7 +50,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         getLocation()
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
 
-        asyncAPICalls()
+        //asyncAPICalls() 
 
 
         mApiClient = GoogleApiClient.Builder(this)
@@ -69,32 +73,31 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val firstUpdate = async(CommonPool) {
             calculatePath()
         }
-        launch(UI) {
+        launch(CommonPool) {
             doTrip(firstUpdate.await())
-            updateUI(firstUpdate.await())
-            updateOverview(firstUpdate.await())
         }
 
     }
-
 
     private fun updateTime(time: Long) {
         this.time.setText(time.toString())
     }
 
     private fun updateUI(trip: Trip?) {
-
         var activityType = trip!!.Leg.first().name
         if(activityType == "til fods"){
-            this.activity.setText("Gå til")
+            var ss = SpannableString("Gå til \n" + trip.Leg.first().Destination.name)
+            ss.setSpan(RelativeSizeSpan(2f), 0, 6, 0)
+            this.activity.setText(ss)
             this.bus.setText(" ")
         }
         else{
-            this.activity.setText("Stå af ved")
+            var ss = SpannableString("Stå af ved \n" + trip.Leg.first().Destination.name)
+            ss.setSpan(RelativeSizeSpan(2f), 0, 10, 0)
+            this.activity.setText(ss)
             val bus = trip.Leg.filter { l -> l.type != "WALK" }
             this.bus.setText(bus.first().name)
         }
-        this.location.setText(trip.Leg.first().Destination.name)
     }
 
     private fun getTime(time: String): Long {
@@ -109,12 +112,12 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         } catch (ex: SecurityException) {
             Log.d("myTag", "Security Exception, no location available");
         }
-        val originaltrip = trip!!.Leg.first()
-        var tripTime = trip!!.getDuration()
-        var location = trip.Leg.first().Destination.name
+        var location = trip!!.Leg.first().Destination.name
         var tripStarted = false
-        var time :Long= 1
+        var time :Long= 0
         launch(UI) {
+            updateUI(trip)
+            updateOverview(trip)
             while (!trip.Leg.isEmpty()) {
                 try {
                     val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
@@ -124,31 +127,24 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 } catch
                 (ex: SecurityException) {
                     Log.d("myTag", "Security Exception, no location available");
-
                 }
                 if (!tripStarted){
                     time = getTime(trip.Leg.first().Origin.time)
                     updateTime(time)
-                }
-                else{
+                } else{
                     time = getTime(trip.Leg.first().Destination.time)
                     updateTime(time)
                 }
-
-                if (time.toInt() == 15) {
-                    sendNotification("15 minutter til at skulle gå", location)
-                }
-                if (time.toInt() == 0) {
-                    sendNotification("Gå nu til", location)
-                }
-                if (time <= 150) {
-                    // giver tom trip ved sidste element
-
+                if (time == 15L) {
+                    sendNotification("15 minutter til at skulle gå til", location)
+                } else if (time <= 150L) {
+                    //Giver tom trip ved sidste element
+                    println(handleActivityDetection())
                     updateUI(trip)
                     if (tripStarted) {
                         trip.Leg = trip.Leg.drop(1)
-                    }
-                    else {
+                    } else {
+                        sendNotification("Gå nu til", location)
                         tripStarted = true
                     }
                 }
@@ -157,6 +153,12 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             cancel()
         }
     }
+
+    private fun handleActivityDetection(): String {
+        var preferences: SharedPreferences = getSharedPreferences("ActivityRecognition", Context.MODE_PRIVATE)
+        return preferences.getString("Activity", "asd")
+    }
+
 
     override fun onConnected(bundle: Bundle?) {
         val intent = Intent(this, ActivityDetection::class.java)
