@@ -24,40 +24,46 @@ public class ActivityDetection extends IntentService{
     private void handleDetectedActivities(List<DetectedActivity> probableActivities) {
         SharedPreferences preferences = getSharedPreferences("ActivityRecognition", MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putString("Activity", "per");
-        editor.apply();
         for( DetectedActivity activity : probableActivities ) {
             switch( activity.getType() ) {
                 case DetectedActivity.IN_VEHICLE: {
-                    Log.e( "ActivityRecognition", "In Vehicle: " + activity.getConfidence() );
+                    editor.putString("Activity", "In Vehicle");
+                    editor.apply();
                     break;
                 }
                 case DetectedActivity.ON_BICYCLE: {
-                    Log.e( "ActivityRecognition", "On Bicycle: " + activity.getConfidence() );
+                    editor.putString("Activity", "On Bicycle");
+                    editor.apply();
                     break;
                 }
                 case DetectedActivity.ON_FOOT: {
-                    Log.e( "ActivityRecognition", "On Foot: " + activity.getConfidence() );
+                    editor.putString("Activity", "On Foot");
+                    editor.apply();
                     break;
                 }
                 case DetectedActivity.RUNNING: {
-                    Log.e( "ActivityRecognition", "Running: " + activity.getConfidence() );
+                    editor.putString("Activity", "Running");
+                    editor.apply();
                     break;
                 }
                 case DetectedActivity.STILL: {
-                    Log.e( "ActivityRecognition", "Still: " + activity.getConfidence() );
+                    editor.putString("Activity", "Still");
+                    editor.apply();
                     break;
                 }
                 case DetectedActivity.TILTING: {
-                    Log.e( "ActivityRecognition", "Tilting: " + activity.getConfidence() );
+                    editor.putString("Activity", "Tilting");
+                    editor.apply();
                     break;
                 }
                 case DetectedActivity.WALKING: {
-                    Log.e( "ActivityRecognition", "Walking: " + activity.getConfidence() );
+                    editor.putString("Activity", "Walking");
+                    editor.apply();
                     break;
                 }
                 case DetectedActivity.UNKNOWN: {
-                    Log.e( "ActivityRecognition", "Unknown: " + activity.getConfidence() );
+                    editor.putString("Activity", "unknown");
+                    editor.apply();
                     break;
                 }
             }

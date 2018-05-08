@@ -20,6 +20,7 @@ import org.json.JSONArray
 import JSON.TripClass
 import android.app.SharedElementCallback
 import android.content.SharedPreferences
+import android.os.PersistableBundle
 import android.text.SpannableString
 import android.text.style.RelativeSizeSpan
 import android.view.Menu
@@ -37,6 +38,8 @@ import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import java.lang.Long.MAX_VALUE
 import java.lang.Math.abs
+import java.lang.NullPointerException
+import java.nio.file.Files.size
 import java.text.SimpleDateFormat
 
 
@@ -44,14 +47,28 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+//    override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
+//        super.onCreate(savedInstanceState, persistentState)
+//        setContentView(R.layout.activity_main)
+//        getLocation()
+//        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
+//
+//        mApiClient = GoogleApiClient.Builder(this)
+//                .addApi(ActivityRecognition.API)
+//                .addConnectionCallbacks(this)
+//                .addOnConnectionFailedListener(this)
+//                .build();
+//        mApiClient?.connect();
+//
+//        val destination = intent.getStringExtra("Destination")
+//        println(destination)
+//    }
+
+    override fun onStart() {
+        super.onStart()
         setContentView(R.layout.activity_main)
         getLocation()
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
-
-        //asyncAPICalls() 
-
 
         mApiClient = GoogleApiClient.Builder(this)
                 .addApi(ActivityRecognition.API)
@@ -59,6 +76,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 .addOnConnectionFailedListener(this)
                 .build();
         mApiClient?.connect();
+
+        val destination = intent.getStringExtra("destination")
+        println(destination)
     }
 
     private fun updateOverview(trip: Trip?) {//Dangerous when less than three elements
@@ -89,7 +109,12 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             var ss = SpannableString("Gå til \n" + trip.Leg.first().Destination.name)
             ss.setSpan(RelativeSizeSpan(2f), 0, 6, 0)
             this.activity.setText(ss)
-            this.bus.setText(" ")
+            if(trip.Leg.count() != 1){ //In order to set bus field on first run
+                val bus = trip.Leg.filter { l -> l.type != "WALK" }
+                this.bus.setText(bus.first().name)
+            }else{
+                this.bus.setText(" ")
+            }
         }
         else{
             var ss = SpannableString("Stå af ved \n" + trip.Leg.first().Destination.name)
@@ -137,9 +162,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 }
                 if (time == 15L) {
                     sendNotification("15 minutter til at skulle gå til", location)
-                } else if (time <= 150L) {
+                } else if (time <= 1L && handleActivityDetection() == "In Vehicle") {
                     //Giver tom trip ved sidste element
-                    println(handleActivityDetection())
                     updateUI(trip)
                     if (tripStarted) {
                         trip.Leg = trip.Leg.drop(1)
@@ -155,8 +179,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun handleActivityDetection(): String {
-        var preferences: SharedPreferences = getSharedPreferences("ActivityRecognition", Context.MODE_PRIVATE)
-        return preferences.getString("Activity", "asd")
+        val preferences: SharedPreferences = getSharedPreferences("ActivityRecognition", Context.MODE_PRIVATE)
+        return preferences.getString("Activity", "default")
     }
 
 
@@ -176,7 +200,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun calculatePath(): Trip? {
-        val customLocation = "Aalborg busterminal"
+        val customLocation = intent.getStringExtra("destination")//"Aalborg busterminal"
         val destCordinates = getXYCordinates(customLocation)
         var address = ""
         try {
@@ -216,19 +240,22 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         if (reader != null) {
             val triplist = reader.TripList
             val trips = triplist.Trip
-            var bestTrip = trips.first()
-
-            if (tripMetrics == "first") {
-                return bestTrip
-            } else if (tripMetrics == "fastest") {
-                for (trip in trips) {
-                    if (trip.getDuration() < bestTime) {
-                        bestTime = trip.getDuration()
-                        bestTrip = trip
+            try {
+                var bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).first()
+                if (tripMetrics == "first") {
+                    return bestTrip
+                } else if (tripMetrics == "fastest") {
+                    for (trip in trips) {
+                        if (trip.getDuration() < bestTime) {
+                            bestTime = trip.getDuration()
+                            bestTrip = trip
+                        }
                     }
                 }
+                return bestTrip
+            }catch (ex: NullPointerException) {
+                Log.d("Null pointer", "No walk-bus-walk trip available");
             }
-            return bestTrip
         }
         return null
     }
