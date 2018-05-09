@@ -1,5 +1,6 @@
 package d803.busplanning
 
+import JSON.Leg
 import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -20,6 +21,8 @@ import org.json.JSONArray
 import JSON.TripClass
 import android.app.SharedElementCallback
 import android.content.SharedPreferences
+import android.os.CountDownTimer
+import android.os.Handler
 import android.os.PersistableBundle
 import android.text.SpannableString
 import android.text.style.RelativeSizeSpan
@@ -47,23 +50,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
 
-//    override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
-//        super.onCreate(savedInstanceState, persistentState)
-//        setContentView(R.layout.activity_main)
-//        getLocation()
-//        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
-//
-//        mApiClient = GoogleApiClient.Builder(this)
-//                .addApi(ActivityRecognition.API)
-//                .addConnectionCallbacks(this)
-//                .addOnConnectionFailedListener(this)
-//                .build();
-//        mApiClient?.connect();
-//
-//        val destination = intent.getStringExtra("Destination")
-//        println(destination)
-//    }
-
     override fun onStart() {
         super.onStart()
         setContentView(R.layout.activity_main)
@@ -88,7 +74,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         this.destination.setText(trip.Leg[2].Destination.time)
     }
 
-    // handle button activities
     private fun asyncAPICalls() {
         val firstUpdate = async(CommonPool) {
             calculatePath()
@@ -96,33 +81,27 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         launch(CommonPool) {
             doTrip(firstUpdate.await())
         }
-
     }
 
     private fun updateTime(time: Long) {
         this.time.setText(time.toString())
     }
 
-    private fun updateUI(trip: Trip?) {
-        var activityType = trip!!.Leg.first().name
-        if(activityType == "til fods"){
-            var ss = SpannableString("Gå til \n" + trip.Leg.first().Destination.name)
+    private fun updateActivity(leg: Leg) {
+        if (leg.name == "til fods") {
+            val ss = SpannableString("Gå til \n" + leg.Destination.name)
             ss.setSpan(RelativeSizeSpan(2f), 0, 6, 0)
             this.activity.setText(ss)
-            if(trip.Leg.count() != 1){ //In order to set bus field on first run
-                val bus = trip.Leg.filter { l -> l.type != "WALK" }
-                this.bus.setText(bus.first().name)
-            }else{
-                this.bus.setText(" ")
-            }
-        }
-        else{
-            var ss = SpannableString("Stå af ved \n" + trip.Leg.first().Destination.name)
+        } else {
+            val ss = SpannableString("Stå af ved \n" + leg.Destination.name)
             ss.setSpan(RelativeSizeSpan(2f), 0, 10, 0)
             this.activity.setText(ss)
-            val bus = trip.Leg.filter { l -> l.type != "WALK" }
-            this.bus.setText(bus.first().name)
         }
+    }
+
+    private fun updateBus(trip: Trip?) {
+        val bus = trip!!.Leg.filter { l -> l.type != "WALK" }
+        this.bus.setText(bus.first().name)
     }
 
     private fun getTime(time: String): Long {
@@ -130,20 +109,51 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         return (from.time - getCurrentTime()) / 60000
     }
 
+    suspend fun handleActivityDetection(): Boolean {
+        var missedBus = true
+        for (time in 3 downTo 0) {
+            if (determineActivity() == "In Vehicle") {
+                missedBus = false
+            }
+            delay(1000)
+        }
+        return missedBus
+    }
+
+    private fun handleNotification(time: Long, location: String) {
+        if (time == 15L) {
+            sendNotification("15 minutter til du skal gå", location)
+        } else if (time == 0L) {
+            sendNotification("Gå nu til", location)
+        }
+    }
+
+    suspend fun firstTripPart(trip: Trip?): Trip{
+        val firstLeg = trip!!.Leg.first()
+        updateOverview(trip)
+        updateBus(trip)
+        updateActivity(firstLeg)
+        for (time in getTime(firstLeg.Origin.time) downTo 0) {
+            handleNotification(time, firstLeg.Destination.name)
+            updateTime(time)
+            delay(1000)
+        }
+        trip.Leg = trip.Leg.drop(1)
+        return trip
+    }
+
     private fun doTrip(trip: Trip?) {
         var startLocation: Location? = null
+        var stop = false
         try {
             startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         } catch (ex: SecurityException) {
             Log.d("myTag", "Security Exception, no location available");
         }
-        var location = trip!!.Leg.first().Destination.name
-        var tripStarted = false
-        var time :Long= 0
         launch(UI) {
-            updateUI(trip)
-            updateOverview(trip)
-            while (!trip.Leg.isEmpty()) {
+            val secondTripPart = firstTripPart(trip)
+            var onBus = true
+            for (leg: Leg in secondTripPart.Leg) {
                 try {
                     val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                     if ((abs(startLocation!!.distanceTo(locationCheck)) >= 50)) {
@@ -153,36 +163,42 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 (ex: SecurityException) {
                     Log.d("myTag", "Security Exception, no location available");
                 }
-                if (!tripStarted){
-                    time = getTime(trip.Leg.first().Origin.time)
-                    updateTime(time)
-                } else{
-                    time = getTime(trip.Leg.first().Destination.time)
-                    updateTime(time)
-                }
-                if (time == 15L) {
-                    sendNotification("15 minutter til at skulle gå til", location)
-                } else if (time <= 1L && handleActivityDetection() == "In Vehicle") {
-                    //Giver tom trip ved sidste element
-                    updateUI(trip)
-                    if (tripStarted) {
-                        trip.Leg = trip.Leg.drop(1)
-                    } else {
-                        sendNotification("Gå nu til", location)
-                        tripStarted = true
+
+                val job = launch(UI) {
+                    updateActivity(leg)
+                    for (time in getTime(leg.Destination.time) downTo 0) {
+                        if (stop == true){
+                            cancel()
+                        }else{
+                            updateTime(time)
+                            delay(1000)
+                        }
                     }
                 }
-                delay(60000)
+
+                if (onBus) {
+                    val findNewRoute = async(CommonPool) {
+                        handleActivityDetection()
+                    }
+                    if (findNewRoute.await()) {
+                        sendNotification("Nåede ikke bussen", "Det virker til du ikke nåde bussen.. Finder ny rute")
+                        stop = true
+                        asyncAPICalls()
+                        cancel()
+                        break
+                    } else {
+                        onBus = false
+                    }
+                }
+                job.join() //Wait for job(coroutine) to finish
             }
-            cancel()
         }
     }
 
-    private fun handleActivityDetection(): String {
+    private fun determineActivity(): String {
         val preferences: SharedPreferences = getSharedPreferences("ActivityRecognition", Context.MODE_PRIVATE)
         return preferences.getString("Activity", "default")
     }
-
 
     override fun onConnected(bundle: Bundle?) {
         val intent = Intent(this, ActivityDetection::class.java)
@@ -232,7 +248,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         return to.time
     }
 
-
     private fun extractTripInfo(pathInfo: String): Trip? {
         var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
@@ -253,7 +268,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     }
                 }
                 return bestTrip
-            }catch (ex: NullPointerException) {
+            } catch (ex: NullPointerException) {
                 Log.d("Null pointer", "No walk-bus-walk trip available");
             }
         }
@@ -264,7 +279,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=" + place + "&format=json").readText()
         val reader = JSONObject(result)
         val locationlist = reader.getJSONObject("LocationList")
-        var keys = locationlist.keys()
+        val keys = locationlist.keys()
         //rigtig grim måde at gøre det på måske
         keys.next()//nonamespaceshemalocation
         val str = keys.next()//coordlocation eller stoplocation
@@ -290,15 +305,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 50f, locationListener);
         } catch (ex: SecurityException) {
             Log.d("myTag", "Security Exception, no location available");
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        var title = "hej"
-        val fixedRateTimer = fixedRateTimer(name = "kappa", initialDelay = 100, period = 100) {
-            //sendNotification(title,"Body")
-            title = title + "j"
         }
     }
 
