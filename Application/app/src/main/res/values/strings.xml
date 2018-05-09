@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">BusPlanning</string>
+    <string name="app_name">BusPlanner</string>
     <string name="show_text">Show text</string>
     <string name="Enter_destination">Enter destination..</string>
     <string name="title_activity_secondary">SecondaryActivity</string>

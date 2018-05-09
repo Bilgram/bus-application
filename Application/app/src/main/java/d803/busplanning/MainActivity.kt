@@ -115,7 +115,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             if (determineActivity() == "In Vehicle") {
                 missedBus = false
             }
-            delay(1000)
+            delay(60000)
         }
         return missedBus
     }
@@ -136,7 +136,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         for (time in getTime(firstLeg.Origin.time) downTo 0) {
             handleNotification(time, firstLeg.Destination.name)
             updateTime(time)
-            delay(1000)
+            delay(60000)
         }
         trip.Leg = trip.Leg.drop(1)
         return trip
@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                             cancel()
                         }else{
                             updateTime(time)
-                            delay(1000)
+                            delay(60000)
                         }
                     }
                 }
