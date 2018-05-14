@@ -57,7 +57,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-
     override fun onStart() {
         super.onStart()
         setContentView(R.layout.activity_main)
@@ -114,22 +113,17 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private fun getTime(time: String): Long {
         val from: Date = SimpleDateFormat("HH:mm").parse(time)
-        return (from.time - getCurrentTime()) / 60000
+        return (from.time - getCurrentTime().time) / 60000
     }
 
     suspend fun handleActivityDetection(): Boolean {
-        var missedBus:MutableList<Boolean> = mutableListOf()
-
-        for (time in 3 downTo 0) {
-            missedBus.add(determineActivity() == "In Vehicle")
-            delay(60000)
+        for (time in 3 * 60 downTo 0) {
+            if (determineActivity() == "In Vehicle") {
+                return false
+            }
+            delay(60000 / 60)
         }
-        val count:Double = missedBus.count().toDouble()
-        val truecount:Double = missedBus.filter { true }.count().toDouble()
-        if (truecount >= count/2)
-            return true
-        else
-            return false
+        return true
     }
 
     private fun handleNotification(time: Long, location: String) {
@@ -176,7 +170,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             }
             delay(60000)
         }
-        for (time in getTime(firstLeg.Destination.time) downTo 0){
+        for (time in getTime(firstLeg.Destination.time) downTo 0) {
             updateTime(time)
             delay(60000)
         }
@@ -206,6 +200,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     }
                     if (findNewRoute.await()) {
                         sendNotification("Nåede ikke bussen", "Det virker til du ikke nåde bussen.. Finder ny rute")
+                        val currentTime = getCurrentTime()
+                        intent.putExtra("time", currentTime.hours.toString() + ":"+ currentTime.minutes.toString())
+                        intent.putExtra("arrival", "0")
                         stop = true
                         asyncAPICalls()
                         cancel()
@@ -252,6 +249,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     private fun calculatePath(): Trip? {
         val customLocation = intent.getStringExtra("destination")
         val time: String = intent.getStringExtra("time")
+        val arrival: String = intent.getStringExtra("arrival")
         val destCordinates = getXYCordinates(customLocation)
         var address = ""
         try {
@@ -270,12 +268,14 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
         val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
                 "originCoordName=" + address + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
-                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&searchForArrival=1&time="+time+"&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&searchForArrival=" + arrival + "&time=" + time + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+
+
         val tripInfo = extractTripInfo(result)
         return tripInfo
     }
 
-    private fun getCurrentTime(): Long {
+    private fun getCurrentTime(): Date {
         val current = java.util.Calendar.getInstance().getTime()
         var currentHourMin = ""
         if (current.minutes < 10) {
@@ -283,18 +283,22 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         } else {
             currentHourMin = current.hours.toString() + ":" + current.minutes.toString()
         }
-        val to = SimpleDateFormat("HH:mm").parse(currentHourMin)
-        return to.time
+        return SimpleDateFormat("HH:mm").parse(currentHourMin)
     }
 
     private fun extractTripInfo(pathInfo: String): Trip? {
         val reader = Klaxon().parse<TripClass>(pathInfo)
+        val arrival: String = intent.getStringExtra("arrival")
         if (reader != null) {
             val trips = reader.TripList.Trip
             try {
-                val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).last()
+                if (arrival == "1"){
+                    val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).last()
+                    return bestTrip
+                }
+                val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).first()
                 return bestTrip
-            }catch (ex: NullPointerException){
+            } catch (ex: NullPointerException) {
                 setTextview2("Intet trip som virker!")
                 Log.d("Not trip found", "Intet korrekt trip!")
             }

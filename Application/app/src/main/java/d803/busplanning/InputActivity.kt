@@ -16,6 +16,7 @@ class InputActivity : AppCompatActivity() {
             val time = (this.time.text).toString()
             intent.putExtra("time",time)
             intent.putExtra("destination", dest)
+            intent.putExtra("arrival","1")
             startActivity(intent)
         }
     }
