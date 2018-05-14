@@ -13,6 +13,8 @@ class InputActivity : AppCompatActivity() {
         this.start.setOnClickListener{
             val intent = Intent(this@InputActivity, MainActivity::class.java)
             val dest = (this.destination.text).toString()
+            val time = (this.time.text).toString()
+            intent.putExtra("time",time)
             intent.putExtra("destination", dest)
             startActivity(intent)
         }

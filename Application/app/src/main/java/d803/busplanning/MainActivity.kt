@@ -118,14 +118,18 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     suspend fun handleActivityDetection(): Boolean {
-        var missedBus = true
+        var missedBus:MutableList<Boolean> = mutableListOf()
+
         for (time in 3 downTo 0) {
-            if (determineActivity() == "In Vehicle") {
-                missedBus = false
-            }
+            missedBus.add(determineActivity() == "In Vehicle")
             delay(60000)
         }
-        return missedBus
+        val count:Double = missedBus.count().toDouble()
+        val truecount:Double = missedBus.filter { true }.count().toDouble()
+        if (truecount >= count/2)
+            return true
+        else
+            return false
     }
 
     private fun handleNotification(time: Long, location: String) {
@@ -153,15 +157,14 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             try {
                 val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 if (abs(startLocation!!.distanceTo(locationCheck)) >= 50 && time > 15) {
+                    startLocation = locationCheck
                     val possibleTrip = async(CommonPool) {
                         calculatePath()
                     }.await()
-                    val possibleTripTime = getTime(possibleTrip!!.Leg.last().Destination.time)
-                    val departurePossibleTripName = possibleTrip.Leg[1].Origin.name
-                    val currentTripTime = getTime(trip.Leg.last().Destination.time)
+                    val departurePossibleTripName = possibleTrip!!.Leg[1].Origin.name
                     val departureTripName = trip.Leg[1].Origin.name
-                    setTextview2("pTT: " + possibleTripTime + "cTT:" + currentTripTime + "dTN:" + departureTripName + "dPTN:" + departurePossibleTripName)
-                    if (possibleTripTime <= currentTripTime && departureTripName != departurePossibleTripName) {
+                    setTextview2(departureTripName + "dPTN:" + departurePossibleTripName)
+                    if (departureTripName != departurePossibleTripName) {
                         setTextview2("Skifter rute..")
                         firstTripPart(possibleTrip)
                         cancel()
@@ -248,6 +251,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private fun calculatePath(): Trip? {
         val customLocation = intent.getStringExtra("destination")
+        val time: String = intent.getStringExtra("time")
         val destCordinates = getXYCordinates(customLocation)
         var address = ""
         try {
@@ -266,7 +270,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
         val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
                 "originCoordName=" + address + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
-                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&searchForArrival=1&time="+time+"&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
         val tripInfo = extractTripInfo(result)
         return tripInfo
     }
@@ -288,7 +292,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         if (reader != null) {
             val trips = reader.TripList.Trip
             try {
-                val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).first()
+                val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).last()
                 return bestTrip
             }catch (ex: NullPointerException){
                 setTextview2("Intet trip som virker!")
