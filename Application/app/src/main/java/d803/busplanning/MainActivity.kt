@@ -19,6 +19,7 @@ import android.location.Location
 import android.location.LocationListener
 import org.json.JSONArray
 import JSON.TripClass
+import android.annotation.SuppressLint
 import android.app.SharedElementCallback
 import android.content.SharedPreferences
 import android.os.CountDownTimer
@@ -32,11 +33,15 @@ import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.NonCancellable.cancel
 import kotlinx.coroutines.experimental.android.UI
 import org.json.JSONObject
+import java.io.IOError
+import java.io.IOException
 import java.util.*
 import kotlin.concurrent.fixedRateTimer
 import java.lang.Long.MAX_VALUE
@@ -44,16 +49,20 @@ import java.lang.Math.abs
 import java.lang.NullPointerException
 import java.nio.file.Files.size
 import java.text.SimpleDateFormat
+import kotlin.reflect.KClass
+import kotlin.reflect.full.isSubclassOf
 
 
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     override fun onStart() {
         super.onStart()
         setContentView(R.layout.activity_main)
         getLocation()
+
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
 
         mApiClient = GoogleApiClient.Builder(this)
@@ -63,8 +72,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                 .build();
         mApiClient?.connect();
 
-        val destination = intent.getStringExtra("destination")
-        println(destination)
+        asyncAPICalls()
     }
 
     private fun updateOverview(trip: Trip?) {//Dangerous when less than three elements
@@ -78,8 +86,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val firstUpdate = async(CommonPool) {
             calculatePath()
         }
-        launch(CommonPool) {
-            doTrip(firstUpdate.await())
+        launch(UI) {
+            firstTripPart(firstUpdate.await())
         }
     }
 
@@ -128,54 +136,67 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
     }
 
-    suspend fun firstTripPart(trip: Trip?): Trip{
+    suspend fun firstTripPart(trip: Trip?) {
+        var startLocation: Location? = null
         val firstLeg = trip!!.Leg.first()
+        try {
+            startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        } catch (ex: SecurityException) {
+            Log.d("myTag", "Security Exception, no location available");
+        }
         updateOverview(trip)
         updateBus(trip)
         updateActivity(firstLeg)
         for (time in getTime(firstLeg.Origin.time) downTo 0) {
             handleNotification(time, firstLeg.Destination.name)
             updateTime(time)
+            try {
+                val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                if (abs(startLocation!!.distanceTo(locationCheck)) >= 50 && time > 15) {
+                    val possibleTrip = async(CommonPool) {
+                        calculatePath()
+                    }.await()
+                    val possibleTripTime = getTime(possibleTrip!!.Leg.last().Destination.time)
+                    val departurePossibleTripName = possibleTrip.Leg[1].Origin.name
+                    val currentTripTime = getTime(trip.Leg.last().Destination.time)
+                    val departureTripName = trip.Leg[1].Origin.name
+                    setTextview2("pTT: " + possibleTripTime + "cTT:" + currentTripTime + "dTN:" + departureTripName + "dPTN:" + departurePossibleTripName)
+                    if (possibleTripTime <= currentTripTime && departureTripName != departurePossibleTripName) {
+                        setTextview2("Skifter rute..")
+                        firstTripPart(possibleTrip)
+                        cancel()
+                    }
+                }
+            } catch
+            (ex: SecurityException) {
+                Log.d("myTag", "Security Exception, no location available");
+            }
+            delay(60000)
+        }
+        for (time in getTime(firstLeg.Destination.time) downTo 0){
+            updateTime(time)
             delay(60000)
         }
         trip.Leg = trip.Leg.drop(1)
-        return trip
+        doTrip(trip)
     }
 
     private fun doTrip(trip: Trip?) {
-        var startLocation: Location? = null
         var stop = false
-        try {
-            startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-        } catch (ex: SecurityException) {
-            Log.d("myTag", "Security Exception, no location available");
-        }
         launch(UI) {
-            val secondTripPart = firstTripPart(trip)
             var onBus = true
-            for (leg: Leg in secondTripPart.Leg) {
-                try {
-                    val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                    if ((abs(startLocation!!.distanceTo(locationCheck)) >= 50)) {
-                        break
-                    }
-                } catch
-                (ex: SecurityException) {
-                    Log.d("myTag", "Security Exception, no location available");
-                }
-
+            for (leg: Leg in trip!!.Leg) {
                 val job = launch(UI) {
                     updateActivity(leg)
                     for (time in getTime(leg.Destination.time) downTo 0) {
-                        if (stop == true){
+                        if (stop == true) {
                             cancel()
-                        }else{
+                        } else {
                             updateTime(time)
                             delay(60000)
                         }
                     }
                 }
-
                 if (onBus) {
                     val findNewRoute = async(CommonPool) {
                         handleActivityDetection()
@@ -215,22 +236,36 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
+    private fun setTextview2(str: String) {
+        this.textView2.setText(str)
+    }
+
+    fun <R> Throwable.multicatch(vararg classes: KClass<*>, block: () -> R): R {
+        if (classes.any { this::class.isSubclassOf(it) }) {
+            return block()
+        } else throw this
+    }
+
     private fun calculatePath(): Trip? {
-        val customLocation = intent.getStringExtra("destination")//"Aalborg busterminal"
+        val customLocation = intent.getStringExtra("destination")
         val destCordinates = getXYCordinates(customLocation)
         var address = ""
         try {
             val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             val geoCoder = Geocoder(this, Locale.getDefault())
             address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
+            launch(UI) {
+                setTextview2(address)
+            }
         } catch (ex: SecurityException) {
-            address = "Selma Lagerløfsvej 300"
+            setTextview2("ingen addresse fundet")
+            //address = "Selma Lagerløfsvej 300"
             Log.d("myTag", "Security Exception, no location available");
         }
         val startCordinates = getXYCordinates(address)
         //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
         val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
-                "originCoordName=" + address.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
+                "originCoordName=" + address + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
                 "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
         val tripInfo = extractTripInfo(result)
         return tripInfo
@@ -249,27 +284,15 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun extractTripInfo(pathInfo: String): Trip? {
-        var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
-        val tripMetrics = "first"
         if (reader != null) {
-            val triplist = reader.TripList
-            val trips = triplist.Trip
+            val trips = reader.TripList.Trip
             try {
-                var bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).first()
-                if (tripMetrics == "first") {
-                    return bestTrip
-                } else if (tripMetrics == "fastest") {
-                    for (trip in trips) {
-                        if (trip.getDuration() < bestTime) {
-                            bestTime = trip.getDuration()
-                            bestTrip = trip
-                        }
-                    }
-                }
+                val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).first()
                 return bestTrip
-            } catch (ex: NullPointerException) {
-                Log.d("Null pointer", "No walk-bus-walk trip available");
+            }catch (ex: NullPointerException){
+                setTextview2("Intet trip som virker!")
+                Log.d("Not trip found", "Intet korrekt trip!")
             }
         }
         return null
@@ -324,7 +347,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
-            asyncAPICalls()
+            //asyncAPICalls()
         }
 
         override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
