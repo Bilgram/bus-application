@@ -17,42 +17,23 @@ import android.location.Location
 import android.location.LocationListener
 import org.json.JSONArray
 import JSON.TripClass
-import android.annotation.SuppressLint
-import android.app.SharedElementCallback
 import android.content.*
-import android.os.CountDownTimer
-import android.os.Handler
-import android.os.PersistableBundle
 import android.text.SpannableString
 import android.text.style.RelativeSizeSpan
-import android.view.Menu
-import android.view.MenuItem
 import android.view.WindowManager
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GooglePlayServicesUtil
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
-import com.google.android.gms.location.ActivityRecognitionClient
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.NonCancellable.cancel
 import kotlinx.coroutines.experimental.android.UI
 import org.json.JSONObject
-import java.io.IOError
-import java.io.IOException
 import java.util.*
-import kotlin.concurrent.fixedRateTimer
-import java.lang.Long.MAX_VALUE
 import java.lang.Math.abs
 import java.lang.NullPointerException
-import java.nio.file.Files.size
 import java.text.SimpleDateFormat
-import kotlin.reflect.KClass
-import kotlin.reflect.full.isSubclassOf
-
 
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
@@ -74,7 +55,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
         bReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                //val v = "Activity :" + intent.getStringExtra("Activity") + " " + "Confidence : " + intent.extras!!.getInt("Confidence") + "\n"
                 mostProbableActivity = intent.getStringExtra("Activity")
                 vehicleActivity = intent.getStringExtra("vehicle")
                 vehicleConfidence = intent.extras!!.getInt("vehicle confidence")
@@ -94,7 +74,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
-    private fun updateOverview(trip: Trip?) {//Dangerous when less than three elements
+    //Dangerous when less than three elements
+    private fun updateOverview(trip: Trip?) {
         this.walkBegin.setText(trip!!.Leg[0].Origin.time)
         this.busBegin.setText(trip.Leg[1].Origin.time)
         this.walkBeginLast.setText(trip.Leg[2].Origin.time)
@@ -239,14 +220,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
     }
 
-    private fun determineActivity(): String {
-        val preferences: SharedPreferences = getSharedPreferences("ActivityRecognition", Context.MODE_PRIVATE)
-        return preferences.getString("Activity", "default")
-    }
-
     override fun onConnected(bundle: Bundle?) {
-        //val intent = Intent(this, ActivityDetection::class.java)
-        val intent = Intent(this, BroadActivityDetection::class.java)
+        val intent = Intent(this, ActivityDetection::class.java)
         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
         val client = ActivityRecognition.getClient(this)
         client.requestActivityUpdates(0, pendingIntent)
@@ -279,7 +254,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             Log.d("myTag", "Security Exception, no location available");
         }
         val startCordinates = getXYCordinates(address)
-        //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
         val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
                 "originCoordName=" + address + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
                 "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&searchForArrival=" + arrival + "&time=" + time + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
@@ -324,7 +298,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val reader = JSONObject(result)
         val locationlist = reader.getJSONObject("LocationList")
         val keys = locationlist.keys()
-        //rigtig grim måde at gøre det på måske
         keys.next()//nonamespaceshemalocation
         val str = keys.next()//coordlocation eller stoplocation
         val test = locationlist.get(str)
@@ -367,23 +340,17 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private val locationListener: LocationListener = object : LocationListener {
-        override fun onLocationChanged(location: Location) {
-            //asyncAPICalls()
-        }
-
+        override fun onLocationChanged(location: Location) {}
         override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
     }
+
     /** base url http://xmlopen.rejseplanen.dk/bin/rest.exe
     url format
     http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
     destCoordY=<yInteger>&destCoordName=<NameOfDestination>&date=
     19.09.10&time=07:02&useBus=0*/
-
-
-
-
 }
 
 

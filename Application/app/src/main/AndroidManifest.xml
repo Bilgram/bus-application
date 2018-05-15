@@ -26,7 +26,6 @@
         </activity>
 
         <service android:name=".ActivityDetection" />
-        <service android:name=".BroadActivityDetection" />
     </application>
 
 </manifest>
