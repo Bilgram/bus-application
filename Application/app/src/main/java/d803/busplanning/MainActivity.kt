@@ -11,8 +11,6 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.location.Geocoder
 import android.location.LocationManager
 import android.location.Location
@@ -21,7 +19,7 @@ import org.json.JSONArray
 import JSON.TripClass
 import android.annotation.SuppressLint
 import android.app.SharedElementCallback
-import android.content.SharedPreferences
+import android.content.*
 import android.os.CountDownTimer
 import android.os.Handler
 import android.os.PersistableBundle
@@ -29,10 +27,13 @@ import android.text.SpannableString
 import android.text.style.RelativeSizeSpan
 import android.view.Menu
 import android.view.MenuItem
+import android.view.WindowManager
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GooglePlayServicesUtil
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityRecognitionClient
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.android.synthetic.main.activity_main.*
@@ -56,22 +57,41 @@ import kotlin.reflect.full.isSubclassOf
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    var mostProbableActivity: String = ""
+    var vehicleActivity: String = ""
+    var vehicleConfidence: Int = 1
+    var bReceiver:BroadcastReceiver? = null
+
     override fun onStart() {
         super.onStart()
         setContentView(R.layout.activity_main)
         getLocation()
-
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
+        buildGoogleAPIClient()
 
+        asyncAPICalls()
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        bReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                //val v = "Activity :" + intent.getStringExtra("Activity") + " " + "Confidence : " + intent.extras!!.getInt("Confidence") + "\n"
+                mostProbableActivity = intent.getStringExtra("Activity")
+                vehicleActivity = intent.getStringExtra("vehicle")
+                vehicleConfidence = intent.extras!!.getInt("vehicle confidence")
+            }
+        }
+        val filter = IntentFilter()
+        filter.addAction("com.kpbird.myactivityrecognition.ACTIVITY_RECOGNITION_DATA")
+        registerReceiver(bReceiver, filter)
+    }
+
+    private fun buildGoogleAPIClient(){
         mApiClient = GoogleApiClient.Builder(this)
                 .addApi(ActivityRecognition.API)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .build();
         mApiClient?.connect();
-
-        asyncAPICalls()
     }
 
     private fun updateOverview(trip: Trip?) {//Dangerous when less than three elements
@@ -118,7 +138,10 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     suspend fun handleActivityDetection(): Boolean {
         for (time in 3 * 60 downTo 0) {
-            if (determineActivity() == "In Vehicle") {
+            launch(UI){
+                setTextview2(mostProbableActivity + "---VehicleStatus:" + vehicleActivity + "Confidence: " + vehicleConfidence)
+            }
+            if (mostProbableActivity == "In Vehicle") {
                 return false
             }
             delay(60000 / 60)
@@ -145,7 +168,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         updateOverview(trip)
         updateBus(trip)
         updateActivity(firstLeg)
-        for (time in getTime(firstLeg.Origin.time) downTo 0) {
+        for (time in getTime(firstLeg.Origin.time) downTo 1) {
             handleNotification(time, firstLeg.Destination.name)
             updateTime(time)
             try {
@@ -201,7 +224,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     if (findNewRoute.await()) {
                         sendNotification("Nåede ikke bussen", "Det virker til du ikke nåde bussen.. Finder ny rute")
                         val currentTime = getCurrentTime()
-                        intent.putExtra("time", currentTime.hours.toString() + ":"+ currentTime.minutes.toString())
+                        intent.putExtra("time", currentTime.hours.toString() + ":" + currentTime.minutes.toString())
                         intent.putExtra("arrival", "0")
                         stop = true
                         asyncAPICalls()
@@ -222,7 +245,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     override fun onConnected(bundle: Bundle?) {
-        val intent = Intent(this, ActivityDetection::class.java)
+        //val intent = Intent(this, ActivityDetection::class.java)
+        val intent = Intent(this, BroadActivityDetection::class.java)
         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
         val client = ActivityRecognition.getClient(this)
         client.requestActivityUpdates(0, pendingIntent)
@@ -240,12 +264,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         this.textView2.setText(str)
     }
 
-    fun <R> Throwable.multicatch(vararg classes: KClass<*>, block: () -> R): R {
-        if (classes.any { this::class.isSubclassOf(it) }) {
-            return block()
-        } else throw this
-    }
-
     private fun calculatePath(): Trip? {
         val customLocation = intent.getStringExtra("destination")
         val time: String = intent.getStringExtra("time")
@@ -256,12 +274,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             val startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             val geoCoder = Geocoder(this, Locale.getDefault())
             address = geoCoder.getFromLocation(startLocation!!.latitude, startLocation.longitude, 1)[0].getAddressLine(0)
-            launch(UI) {
-                setTextview2(address)
-            }
         } catch (ex: SecurityException) {
-            setTextview2("ingen addresse fundet")
-            //address = "Selma Lagerløfsvej 300"
+            address = "Selma Lagerløfsvej 300"
             Log.d("myTag", "Security Exception, no location available");
         }
         val startCordinates = getXYCordinates(address)
@@ -292,14 +306,13 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         if (reader != null) {
             val trips = reader.TripList.Trip
             try {
-                if (arrival == "1"){
+                if (arrival == "1") {
                     val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).last()
                     return bestTrip
                 }
                 val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).first()
                 return bestTrip
             } catch (ex: NullPointerException) {
-                setTextview2("Intet trip som virker!")
                 Log.d("Not trip found", "Intet korrekt trip!")
             }
         }
@@ -367,6 +380,10 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
     destCoordY=<yInteger>&destCoordName=<NameOfDestination>&date=
     19.09.10&time=07:02&useBus=0*/
+
+
+
+
 }
 
 
