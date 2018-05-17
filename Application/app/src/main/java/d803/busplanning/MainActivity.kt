@@ -119,9 +119,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     suspend fun handleActivityDetection(): Boolean {
         for (time in 3 * 60 downTo 0) {
-            launch(UI){
-                setTextview2(mostProbableActivity + "---VehicleStatus:" + vehicleActivity + "Confidence: " + vehicleConfidence)
-            }
             if (mostProbableActivity == "In Vehicle") {
                 return false
             }
@@ -161,9 +158,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                     }.await()
                     val departurePossibleTripName = possibleTrip!!.Leg[1].Origin.name
                     val departureTripName = trip.Leg[1].Origin.name
-                    setTextview2(departureTripName + "dPTN:" + departurePossibleTripName)
                     if (departureTripName != departurePossibleTripName) {
-                        setTextview2("Skifter rute..")
                         firstTripPart(possibleTrip)
                         cancel()
                     }
@@ -203,7 +198,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                         handleActivityDetection()
                     }
                     if (findNewRoute.await()) {
-                        sendNotification("Nåede ikke bussen", "Det virker til du ikke nåde bussen.. Finder ny rute")
+                        sendNotification("Ny rute", "Det virker til du ikke nåde bussen.. Finder ny rute")
                         val currentTime = getCurrentTime()
                         intent.putExtra("time", currentTime.hours.toString() + ":" + currentTime.minutes.toString())
                         intent.putExtra("arrival", "0")
@@ -233,10 +228,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
 
     override fun onConnectionFailed(connectionResult: ConnectionResult) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    private fun setTextview2(str: String) {
-        this.textView2.setText(str)
     }
 
     private fun calculatePath(): Trip? {
