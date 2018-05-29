@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     private fun handleNotification(time: Long, location: String) {
         if (time == 15L) {
             sendNotification("15 minutter til du skal gå", location)
-        } else if (time == 0L) {
+        } else if (time == 1L) {
             sendNotification("Gå nu til", location)
         }
     }
@@ -184,7 +184,8 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             for (leg: Leg in trip!!.Leg) {
                 val job = launch(UI) {
                     updateActivity(leg)
-                    for (time in getTime(leg.Destination.time) downTo 0) {
+                    val testTime = getTime(leg.Destination.time)
+                    for (time in testTime downTo 0) {
                         if (stop == true) {
                             cancel()
                         } else {
