@@ -199,7 +199,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
                         handleActivityDetection()
                     }
                     if (findNewRoute.await()) {
-                        sendNotification("Ny rute", "Det virker til du ikke nåde bussen.. Finder ny rute")
+                        sendNotification("Nåede ikke bussen", "Det virker til du ikke nåede bussen.. Finder ny rute")
                         val currentTime = getCurrentTime()
                         intent.putExtra("time", currentTime.hours.toString() + ":" + currentTime.minutes.toString())
                         intent.putExtra("arrival", "0")
