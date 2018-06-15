@@ -1,5 +1,6 @@
 package d803.busplanning
 
+import JSON.Leg
 import JSON.Trip
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -10,16 +11,16 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.location.Geocoder
 import android.location.LocationManager
 import android.location.Location
 import android.location.LocationListener
 import org.json.JSONArray
 import JSON.TripClass
-import android.view.Menu
-import android.view.MenuItem
+import android.content.*
+import android.text.SpannableString
+import android.text.style.RelativeSizeSpan
+import android.view.WindowManager
 import com.beust.klaxon.Klaxon
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.api.GoogleApiClient
@@ -30,25 +31,41 @@ import kotlinx.coroutines.experimental.NonCancellable.cancel
 import kotlinx.coroutines.experimental.android.UI
 import org.json.JSONObject
 import java.util.*
-import kotlin.concurrent.fixedRateTimer
-import java.lang.Long.MAX_VALUE
 import java.lang.Math.abs
+import java.lang.NullPointerException
 import java.text.SimpleDateFormat
-
 
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
     var locationManager: LocationManager? = null
     var mApiClient: GoogleApiClient? = null
+    var mostProbableActivity: String = ""
+    var vehicleActivity: String = ""
+    var vehicleConfidence: Int = 1
+    var bReceiver:BroadcastReceiver? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    override fun onStart() {
+        super.onStart()
         setContentView(R.layout.activity_main)
         getLocation()
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_CALENDAR), 1)
+        buildGoogleAPIClient()
 
         asyncAPICalls()
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        bReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                mostProbableActivity = intent.getStringExtra("Activity")
+                vehicleActivity = intent.getStringExtra("vehicle")
+                vehicleConfidence = intent.extras!!.getInt("vehicle confidence")
+            }
+        }
+        val filter = IntentFilter()
+        filter.addAction("com.kpbird.myactivityrecognition.ACTIVITY_RECOGNITION_DATA")
+        registerReceiver(bReceiver, filter)
+    }
 
+    private fun buildGoogleAPIClient(){
         mApiClient = GoogleApiClient.Builder(this)
                 .addApi(ActivityRecognition.API)
                 .addConnectionCallbacks(this)
@@ -57,104 +74,145 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         mApiClient?.connect();
     }
 
-    private fun updateOverview(trip: Trip?) {//Dangerous when less than three elements
+    //Dangerous when less than three elements
+    private fun updateOverview(trip: Trip?) {
         this.walkBegin.setText(trip!!.Leg[0].Origin.time)
         this.busBegin.setText(trip.Leg[1].Origin.time)
         this.walkBeginLast.setText(trip.Leg[2].Origin.time)
         this.destination.setText(trip.Leg[2].Destination.time)
     }
 
-    // handle button activities
     private fun asyncAPICalls() {
         val firstUpdate = async(CommonPool) {
             calculatePath()
         }
         launch(UI) {
-            doTrip(firstUpdate.await())
-            updateUI(firstUpdate.await())
-            updateOverview(firstUpdate.await())
+            firstTripPart(firstUpdate.await())
         }
-
     }
-
 
     private fun updateTime(time: Long) {
         this.time.setText(time.toString())
     }
 
-    private fun updateUI(trip: Trip?) {
+    private fun updateActivity(leg: Leg) {
+        if (leg.name == "til fods") {
+            val ss = SpannableString("Gå til \n" + leg.Destination.name)
+            ss.setSpan(RelativeSizeSpan(2f), 0, 6, 0)
+            this.activity.setText(ss)
+        } else {
+            val ss = SpannableString("Stå af ved \n" + leg.Destination.name)
+            ss.setSpan(RelativeSizeSpan(2f), 0, 10, 0)
+            this.activity.setText(ss)
+        }
+    }
 
-        var activityType = trip!!.Leg.first().name
-        if(activityType == "til fods"){
-            this.activity.setText("Gå til")
-            this.bus.setText(" ")
-        }
-        else{
-            this.activity.setText("Stå af ved")
-            val bus = trip.Leg.filter { l -> l.type != "WALK" }
-            this.bus.setText(bus.first().name)
-        }
-        this.location.setText(trip.Leg.first().Destination.name)
+    private fun updateBus(trip: Trip?) {
+        val bus = trip!!.Leg.filter { l -> l.type != "WALK" }
+        this.bus.setText(bus.first().name)
     }
 
     private fun getTime(time: String): Long {
         val from: Date = SimpleDateFormat("HH:mm").parse(time)
-        return (from.time - getCurrentTime()) / 60000
+        return (from.time - getCurrentTime().time) / 60000
     }
 
-    private fun doTrip(trip: Trip?) {
+    suspend fun handleActivityDetection(): Boolean {
+        for (time in 3 * 60 downTo 0) {
+            if (mostProbableActivity == "In Vehicle") {
+                return false
+            }
+            delay(60000 / 60)
+        }
+        return true
+    }
+
+    private fun handleNotification(time: Long, location: String) {
+        if (time == 15L) {
+            sendNotification("15 minutter til du skal gå", location)
+        } else if (time == 1L) {
+            sendNotification("Gå nu til", location)
+        }
+    }
+
+    suspend fun firstTripPart(trip: Trip?) {
         var startLocation: Location? = null
+        val firstLeg = trip!!.Leg.first()
         try {
             startLocation = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         } catch (ex: SecurityException) {
             Log.d("myTag", "Security Exception, no location available");
         }
-        val originaltrip = trip!!.Leg.first()
-        var tripTime = trip!!.getDuration()
-        var location = trip.Leg.first().Destination.name
-        var tripStarted = false
-        var time :Long= 1
-        launch(UI) {
-            while (!trip.Leg.isEmpty()) {
-                try {
-                    val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                    if ((abs(startLocation!!.distanceTo(locationCheck)) >= 50)) {
-                        break
-                    }
-                } catch
-                (ex: SecurityException) {
-                    Log.d("myTag", "Security Exception, no location available");
-
-                }
-                if (!tripStarted){
-                    time = getTime(trip.Leg.first().Origin.time)
-                    updateTime(time)
-                }
-                else{
-                    time = getTime(trip.Leg.first().Destination.time)
-                    updateTime(time)
-                }
-
-                if (time.toInt() == 15) {
-                    sendNotification("15 minutter til at skulle gå", location)
-                }
-                if (time.toInt() == 0) {
-                    sendNotification("Gå nu til", location)
-                }
-                if (time <= 150) {
-                    // giver tom trip ved sidste element
-
-                    updateUI(trip)
-                    if (tripStarted) {
-                        trip.Leg = trip.Leg.drop(1)
-                    }
-                    else {
-                        tripStarted = true
+        updateOverview(trip)
+        updateBus(trip)
+        updateActivity(firstLeg)
+        for (time in getTime(firstLeg.Origin.time) downTo 1) {
+            handleNotification(time, firstLeg.Destination.name)
+            updateTime(time)
+            try {
+                val locationCheck = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                if (abs(startLocation!!.distanceTo(locationCheck)) >= 50 && time > 15) {
+                    startLocation = locationCheck
+                    val possibleTrip = async(CommonPool) {
+                        calculatePath()
+                    }.await()
+                    val departurePossibleTripName = possibleTrip!!.Leg[1].Origin.name
+                    val departureTripName = trip.Leg[1].Origin.name
+                    if (departureTripName != departurePossibleTripName) {
+                        firstTripPart(possibleTrip)
+                        cancel()
                     }
                 }
-                delay(60000)
+            } catch
+            (ex: SecurityException) {
+                Log.d("myTag", "Security Exception, no location available");
             }
-            cancel()
+            delay(60000)
+        }
+        for (time in getTime(firstLeg.Destination.time) downTo 0) {
+            updateTime(time)
+            delay(60000)
+        }
+        trip.Leg = trip.Leg.drop(1)
+        doTrip(trip)
+    }
+
+    private fun doTrip(trip: Trip?) {
+        var stop = false
+        launch(UI) {
+            var onBus = true
+            for (leg: Leg in trip!!.Leg) {
+                val job = launch(UI) {
+                    updateActivity(leg)
+                    val testTime = getTime(leg.Destination.time)
+                    for (time in testTime downTo 0) {
+                        if (stop == true) {
+                            cancel()
+                        } else {
+                            updateTime(time)
+                            delay(60000)
+                        }
+                    }
+                }
+                if (onBus) {
+                    val findNewRoute = async(CommonPool) {
+                        handleActivityDetection()
+                    }
+                    if (findNewRoute.await()) {
+                        sendNotification("Nåede ikke bussen", "Det virker til du ikke nåede bussen.. Finder ny rute")
+                        val currentTime = getCurrentTime()
+                        intent.putExtra("time", currentTime.hours.toString() + ":" + currentTime.minutes.toString())
+                        intent.putExtra("arrival", "0")
+                        stop = true
+                        asyncAPICalls()
+                        cancel()
+                        break
+                    } else {
+                        onBus = false
+                    }
+                }
+                job.join() //Wait for job(coroutine) to finish
+            }
         }
     }
 
@@ -174,7 +232,9 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private fun calculatePath(): Trip? {
-        val customLocation = "Aalborg busterminal"
+        val customLocation = intent.getStringExtra("destination")
+        val time: String = intent.getStringExtra("time")
+        val arrival: String = intent.getStringExtra("arrival")
         val destCordinates = getXYCordinates(customLocation)
         var address = ""
         try {
@@ -186,15 +246,16 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
             Log.d("myTag", "Security Exception, no location available");
         }
         val startCordinates = getXYCordinates(address)
-        //result mangler time og date og så den søger efter arrival time todo når vi kan læse fra kalender
         val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/trip?" +
-                "originCoordName=" + address.toString() + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
-                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+                "originCoordName=" + address + "&originCoordX=" + startCordinates[0] + "&originCoordY=" + startCordinates[1] +
+                "&destCoordName=" + customLocation + "&destCoordX=" + destCordinates[0] + "&searchForArrival=" + arrival + "&time=" + time + "&destCoordY=" + destCordinates[1] + "&format=json\n").readText()
+
+
         val tripInfo = extractTripInfo(result)
         return tripInfo
     }
 
-    private fun getCurrentTime(): Long {
+    private fun getCurrentTime(): Date {
         val current = java.util.Calendar.getInstance().getTime()
         var currentHourMin = ""
         if (current.minutes < 10) {
@@ -202,31 +263,24 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         } else {
             currentHourMin = current.hours.toString() + ":" + current.minutes.toString()
         }
-        val to = SimpleDateFormat("HH:mm").parse(currentHourMin)
-        return to.time
+        return SimpleDateFormat("HH:mm").parse(currentHourMin)
     }
 
-
     private fun extractTripInfo(pathInfo: String): Trip? {
-        var bestTime = MAX_VALUE
         val reader = Klaxon().parse<TripClass>(pathInfo)
-        val tripMetrics = "first"
+        val arrival: String = intent.getStringExtra("arrival")
         if (reader != null) {
-            val triplist = reader.TripList
-            val trips = triplist.Trip
-            var bestTrip = trips.first()
-
-            if (tripMetrics == "first") {
-                return bestTrip
-            } else if (tripMetrics == "fastest") {
-                for (trip in trips) {
-                    if (trip.getDuration() < bestTime) {
-                        bestTime = trip.getDuration()
-                        bestTrip = trip
-                    }
+            val trips = reader.TripList.Trip
+            try {
+                if (arrival == "1") {
+                    val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).last()
+                    return bestTrip
                 }
+                val bestTrip = (trips.filter { l -> l.Leg.count() == 3 }).first()
+                return bestTrip
+            } catch (ex: NullPointerException) {
+                Log.d("Not trip found", "Intet korrekt trip!")
             }
-            return bestTrip
         }
         return null
     }
@@ -235,8 +289,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         val result = URL("http://xmlopen.rejseplanen.dk/bin/rest.exe/location?input=" + place + "&format=json").readText()
         val reader = JSONObject(result)
         val locationlist = reader.getJSONObject("LocationList")
-        var keys = locationlist.keys()
-        //rigtig grim måde at gøre det på måske
+        val keys = locationlist.keys()
         keys.next()//nonamespaceshemalocation
         val str = keys.next()//coordlocation eller stoplocation
         val test = locationlist.get(str)
@@ -264,15 +317,6 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        var title = "hej"
-        val fixedRateTimer = fixedRateTimer(name = "kappa", initialDelay = 100, period = 100) {
-            //sendNotification(title,"Body")
-            title = title + "j"
-        }
-    }
-
     fun sendNotification(title: String, body: String) {
         val intent = Intent()
         val pendingIntent = PendingIntent.getActivity(this@MainActivity, 0, intent, 0)
@@ -288,14 +332,12 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks, G
     }
 
     private val locationListener: LocationListener = object : LocationListener {
-        override fun onLocationChanged(location: Location) {
-            asyncAPICalls()
-        }
-
+        override fun onLocationChanged(location: Location) {}
         override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
     }
+
     /** base url http://xmlopen.rejseplanen.dk/bin/rest.exe
     url format
     http://<baseurl>/trip?originId=8600626&destCoordX=<xInteger>&
