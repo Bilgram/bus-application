@@ -2,37 +2,139 @@ import wikipedia
 from bs4 import BeautifulSoup as bs
 import pandas as pd
 import numpy as np
+from collections import Counter
+import math
+import csv
 
-content_size = 500
-cities = ['New York City', 'London', 'Singapore', 'Angelsberg', 'Hong Kong', 'Los Angeles', 'Paris', 'Chicago',
-'Washington, D.C.', 'San Francisco', 'Rome', 'Mumbai', 'Toronto', 'Philadelphia', 'Monaco', 'Amsterdam', 'Tokyo',
-'Boston', 'Barcelona', 'Istanbul', 'Berlin', 'Pompeii', 'Rio de Janeiro', 'Seattle', 'Venice', 'Sparta', 'Shanghai',
-'Vancouver', 'Jerusalem', 'Macau', 'Montreal']
-adjacency_list = np.zeros(shape=(len(cities), len(cities)))
+#Rel-RW (Robust EL with RandomWalks)
 
-def get_text(name):
-    page = wikipedia.page(name)
+modern_political_leaders_entity = ['Donald Trump','Barack Obama','Adolf Hitler','Elizabeth II','Abraham Lincoln',
+                             'John F. Kennedy','Henry VIII of England','Nelson Mandela','George W. Bush',
+                             'Ronald Reagan','Queen Victoria','Bill Clinton','George Washington','Osama bin Laden',
+                             'Franklin D. Roosevelt','Elizabeth I','Winston Churchill','Mahatma Gandhi',
+                             'Christopher Columbus','Che Guevara','Joseph Stalin','Richard Nixon','Vladimir Putin',
+                             'Charles, Prince of Wales','Prince Philip, Duke of Edinburgh','Sarah Palin',
+                             'Theodore Roosevelt','Thomas Jefferson','Benjamin Franklin','George H.W. Bush',
+                             'Margaret Thatcher']
 
-    return page.content[0:content_size], page.html()
+def get_html(name):
+    return wikipedia.page(name).html()
 
-def get_links(html):
+def get_links_mention(html):
     soup = bs(html, "html.parser")
     hlinks = []
-    for link in soup.find_all("a"):
-        url = link.get("href", "")
-        if "/wiki/" in url:
-            hlinks.append(link.text.strip())
+    for element in soup.find_all("a"):
+        url = element.get('href')
+        if url is not None and "/wiki/" in url:
+            hlinks.append(url)
 
     return hlinks
 
-for i, city1 in enumerate(cities):
-    print(i)
-    content, html = get_text(city1)
-    links = get_links(html)
-    for j, city2 in enumerate(cities):
-        content2 = get_text(city2)
-        if any(link in content2 for link in links):
-            adjacency_list[i,j] = 1
-            print(adjacency_list)
+# def create_semantic_signature(entities):
+#     wiki_entities = list(map(lambda x: ('/wiki/') + x.replace(' ', '_'), entities))
+#     semantic_signature = pd.DataFrame(columns=wiki_entities)
+#
+#     for i, entity in enumerate(entities):
+#         print(entity)
+#         html = get_html(entity)
+#         links = get_links_mention(html)
+#
+#         occurences = Counter([l for l in links if l in wiki_entities]) #Returns dict with political leader occurences
+#         occurences = pd.Series(occurences, name=entity)
+#         count = len(occurences)
+#         occurences = occurences.divide(count)
+#
+#         semantic_signature = semantic_signature.append(occurences)
+#         semantic_signature = semantic_signature.fillna(0)
+#
+#     return semantic_signature
 
-#https://github.com/goldsmith/Wikipedia/issues/35
+def create_semantic_signature(entity, links, links_checker):
+    occurences = Counter([l for l in links if l in links_checker])  # Returns dict with political leader occurences
+    occurences = pd.Series(occurences, name=entity)
+    count = occurences.sum()
+    occurences = occurences.divide(count)
+
+    return occurences
+
+def create_semantic_signature_document(wiki_page):
+    entities = get_links_mention(get_html(wiki_page))
+    wiki_entities = list(map(lambda x: ('/wiki/') + x.replace(' ', '_'), modern_political_leaders_entity))
+
+    entity_probs = create_semantic_signature(wiki_page, entities, wiki_entities)
+
+    return entity_probs
+
+def create_semantic_signature_list(entities):
+    wiki_entities = list(map(lambda x: ('/wiki/') + x.replace(' ', '_'), entities))
+    semantic_signature = pd.DataFrame(columns=wiki_entities)
+
+    for i, entity in enumerate(entities):
+        links = get_links_mention(get_html(entity))
+        occurences = create_semantic_signature(entity, links, wiki_entities)
+        semantic_signature = semantic_signature.append(occurences)
+        semantic_signature = semantic_signature.fillna(0)
+
+    return semantic_signature
+
+def create_wiki_term(t):
+    return ('/wiki/') + t.replace(' ', '_')
+
+def tf(term, mentions):
+    frequencies = Counter(mentions)
+    frequencies = pd.Series(frequencies)
+    max = frequencies.max()
+
+    try:
+        ftd = frequencies[term]
+    except KeyError:
+        ftd = 1 # add one  for the first (non hyperlink) mention
+
+    return 0.5+0.5*(ftd/max)
+
+def idf_func(term, D):
+    N = len(D)
+
+    wterm = create_wiki_term(term)
+    numDocs = 1  # 1 for avoidig division by zero
+    for d in D.values():
+        if wterm in d:
+            numDocs += 1
+
+    #numDocs = len([d for d in D if (wterm in d)])
+    division = N/numDocs
+    log = math.log(division)
+    print(type(log))
+    return log
+
+def tfidf(t, d, D):
+    tf_val = tf(t,d)
+    idf_val = idf_func(t, D)
+    return tf_val*idf_val
+
+def create_D():
+    D = {}
+    for leader in modern_political_leaders_entity:
+        print(leader)
+        D[leader] = (get_links_mention(get_html(leader)))
+
+    return D
+
+if __name__ == '__main__':
+    #D = pd.Series.from_csv('document_corpus.csv')
+    D = create_D()
+    #s = create_semantic_signature(modern_political_leaders_entity)
+    #s = create_semantic_signature_document('List_of_current_heads_of_state_and_government')
+    #print(s)
+
+    idf = idf_func('Donald Trump', D)
+    #t = tf(modern_political_leaders_entity[0], ['Donald Trump', 'Donald Trump', 'Daniel', 'Daniel', 'Daniel', 'Daniel', 'Bille'])
+    d = D['Donald Trump']
+    tfidfvar = tfidf('Donald Trump', d, D)
+
+    importances = list(map((lambda x : tfidf(x, D[x], D)), modern_political_leaders_entity))
+
+
+    #missing pof what ever
+    print(importances)
+    #semantic_signature = pd.read_csv('semantic_signature.csv', index_col=0)
